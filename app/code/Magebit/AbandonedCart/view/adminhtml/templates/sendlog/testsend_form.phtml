@@ -1,0 +1,86 @@
+<?php
+
+declare(strict_types=1);
+
+/** @var \Magento\Backend\Block\Template $block */
+/** @var \Magento\Framework\Escaper $escaper */
+
+$saveUrl = $block->getUrl('magebit_abandonedcart/sendlog/testsendsave');
+$listingUrl = $block->getUrl('magebit_abandonedcart/sendlog/index');
+$defaultEmailRaw = $block->getData('default_email');
+$defaultEmail = is_string($defaultEmailRaw) ? $defaultEmailRaw : '';
+
+$esc = static function (string $text) use ($escaper): string {
+    $out = $escaper->escapeHtml($text);
+    return is_string($out) ? $out : '';
+};
+
+$labels = [
+    'title' => $esc((string) __('Send a test email')),
+    'desc' => $esc((string) __(
+        'Dispatches one email of the selected type to the recipient using a sample cart.'
+        . ' No coupon is minted, no send-log row is written.',
+    )),
+    'type_label' => $esc((string) __('Email Type')),
+    'opt_stage_1' => $esc((string) __('Stage 1 — Initial Reminder')),
+    'opt_stage_2' => $esc((string) __('Stage 2 — Follow-up')),
+    'opt_stage_3' => $esc((string) __('Stage 3 — Final + Coupon')),
+    'opt_low_stock' => $esc((string) __('Low Stock Urgency')),
+    'recipient_label' => $esc((string) __('Recipient Email')),
+    'send_button' => $esc((string) __('Send Test')),
+    'back_button' => $esc((string) __('Back to Log')),
+];
+?>
+
+<form action="<?= $escaper->escapeUrl($saveUrl) ?>" method="post" id="magebit_abandonedcart_testsend_form">
+    <?= $block->getBlockHtml('formkey') ?>
+
+    <div class="admin__page-section" style="padding:24px;background:#fff;border-radius:6px;max-width:640px">
+        <div class="admin__page-section-title">
+            <span class="title"><?= /* @noEscape */ $labels['title'] ?></span>
+        </div>
+        <p style="color:#6b7280;margin:8px 0 24px">
+            <?= /* @noEscape */ $labels['desc'] ?>
+        </p>
+
+        <div class="admin__field admin__field-required">
+            <label class="admin__field-label" for="email_type">
+                <span><?= /* @noEscape */ $labels['type_label'] ?></span>
+            </label>
+            <div class="admin__field-control">
+                <select id="email_type" name="email_type" class="admin__control-select" required>
+                    <option value="stage_1"><?= /* @noEscape */ $labels['opt_stage_1'] ?></option>
+                    <option value="stage_2"><?= /* @noEscape */ $labels['opt_stage_2'] ?></option>
+                    <option value="stage_3"><?= /* @noEscape */ $labels['opt_stage_3'] ?></option>
+                    <option value="low_stock"><?= /* @noEscape */ $labels['opt_low_stock'] ?></option>
+                </select>
+            </div>
+        </div>
+
+        <div class="admin__field admin__field-required" style="margin-top:16px">
+            <label class="admin__field-label" for="recipient_email">
+                <span><?= /* @noEscape */ $labels['recipient_label'] ?></span>
+            </label>
+            <div class="admin__field-control">
+                <input id="recipient_email"
+                       name="recipient_email"
+                       type="email"
+                       class="admin__control-text"
+                       value="<?= $escaper->escapeHtmlAttr($defaultEmail) ?>"
+                       placeholder="you@example.com"
+                       required>
+            </div>
+        </div>
+
+        <input type="hidden" name="store_id" value="1">
+
+        <div style="margin-top:24px;display:flex;gap:12px">
+            <button type="submit" class="action-primary">
+                <span><?= /* @noEscape */ $labels['send_button'] ?></span>
+            </button>
+            <a href="<?= $escaper->escapeUrl($listingUrl) ?>" class="action-secondary">
+                <span><?= /* @noEscape */ $labels['back_button'] ?></span>
+            </a>
+        </div>
+    </div>
+</form>

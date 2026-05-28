@@ -7,6 +7,9 @@
         </item>
     </argument>
     <settings>
+        <buttons>
+            <button name="testsend" class="Magebit\AbandonedCart\Block\Adminhtml\SendLog\TestSendButton"/>
+        </buttons>
         <spinner>magebit_abandonedcart_sendlog_listing_columns</spinner>
         <deps>
             <dep>magebit_abandonedcart_sendlog_listing.magebit_abandonedcart_sendlog_listing_data_source</dep>
