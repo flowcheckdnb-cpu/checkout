@@ -6,22 +6,30 @@ namespace Magebit\AbandonedCart\Model\Email;
 
 use Magebit\AbandonedCart\Model\Config;
 use Magebit\AbandonedCart\Service\Coupon\GeneratedCoupon;
+use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\Catalog\Model\Product;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Phrase;
+use Magento\Framework\UrlInterface;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
+use Throwable;
 
 /**
  * Builds + dispatches a test email from a synthetic cart so admins can preview
  * the rendered design without waiting for a real abandonment.
  *
  * Synthetic on purpose: no real coupon is minted (no salesrule_coupon row
- * created), no quote is touched, no send-log entry is written.
+ * created), no quote is touched, no send-log entry is written. The sample
+ * product is pulled from the live catalog when available so the email looks
+ * like a real send (with thumbnail + clickable name).
  */
 class TestEmailService
 {
-    private const SAMPLE_PRODUCT = 'Iris Workout Top (sample)';
-    private const SAMPLE_PRICE = 49.99;
+    private const SAMPLE_SKUS = ['24-MB01', 'WS03', 'WS04', 'WJ01'];
+    private const FALLBACK_PRODUCT_NAME = 'Iris Workout Top (sample)';
+    private const FALLBACK_PRICE = 49.99;
     private const SAMPLE_CURRENCY = 'USD';
     private const SAMPLE_FIRST_NAME = 'Demo';
     private const COUPON_TTL_HOURS = 168;
@@ -31,12 +39,14 @@ class TestEmailService
      * @param BrandVoiceEmailGenerator $generator
      * @param EmailDispatcher $dispatcher
      * @param StoreManagerInterface $storeManager
+     * @param ProductRepositoryInterface $productRepository
      */
     public function __construct(
         private readonly Config $config,
         private readonly BrandVoiceEmailGenerator $generator,
         private readonly EmailDispatcher $dispatcher,
         private readonly StoreManagerInterface $storeManager,
+        private readonly ProductRepositoryInterface $productRepository,
     ) {
     }
 
@@ -67,13 +77,8 @@ class TestEmailService
             );
         }
 
-        $items = [
-            new CartItemSummary(
-                name: self::SAMPLE_PRODUCT,
-                qty: 1.0,
-                rowTotal: self::SAMPLE_PRICE,
-            ),
-        ];
+        $items = [$this->buildSampleItem($store, $storeId)];
+        $subtotal = $items[0]->rowTotal;
 
         $coupon = $this->sampleCoupon($emailType);
 
@@ -83,7 +88,7 @@ class TestEmailService
             self::SAMPLE_FIRST_NAME,
             (string) $store->getName(),
             $items,
-            self::SAMPLE_PRICE,
+            $subtotal,
             self::SAMPLE_CURRENCY,
             $coupon !== null ? $coupon->code : null,
         );
@@ -122,6 +127,77 @@ class TestEmailService
             return $this->config->getLowStockTemplate($storeId);
         }
         return $this->config->getStageTemplate($emailType, $storeId);
+    }
+
+    /**
+     * Build a CartItemSummary from a real sample product, falling back to a name-only placeholder.
+     *
+     * @param Store $store
+     * @param int $storeId
+     * @return CartItemSummary
+     */
+    private function buildSampleItem(Store $store, int $storeId): CartItemSummary
+    {
+        $product = $this->loadSampleProduct($storeId);
+        if ($product === null) {
+            return new CartItemSummary(
+                name: self::FALLBACK_PRODUCT_NAME,
+                qty: 1.0,
+                rowTotal: self::FALLBACK_PRICE,
+            );
+        }
+
+        $mediaBase = $store->getBaseUrl(UrlInterface::URL_TYPE_MEDIA);
+        $imageUrl = '';
+        $thumbRaw = $product->getData('thumbnail');
+        if (is_string($thumbRaw) && $thumbRaw !== '' && $thumbRaw !== 'no_selection') {
+            $imageUrl = rtrim($mediaBase, '/') . '/catalog/product/' . ltrim($thumbRaw, '/');
+        }
+
+        $productUrl = '';
+        $urlRaw = $product->getProductUrl();
+        if (is_string($urlRaw)) {
+            $productUrl = $urlRaw;
+        }
+
+        $nameRaw = $product->getName();
+        $name = is_string($nameRaw) && $nameRaw !== '' ? $nameRaw : self::FALLBACK_PRODUCT_NAME;
+
+        $priceRaw = $product->getFinalPrice();
+        $price = is_numeric($priceRaw) && (float) $priceRaw > 0
+            ? (float) $priceRaw
+            : self::FALLBACK_PRICE;
+
+        return new CartItemSummary(
+            name: $name,
+            qty: 1.0,
+            rowTotal: $price,
+            imageUrl: $imageUrl,
+            productUrl: $productUrl,
+        );
+    }
+
+    /**
+     * Try a small list of known sample-data SKUs; return the first one that exists in the store.
+     *
+     * @param int $storeId
+     * @return Product|null
+     */
+    private function loadSampleProduct(int $storeId): ?Product
+    {
+        foreach (self::SAMPLE_SKUS as $sku) {
+            try {
+                $product = $this->productRepository->get($sku, false, $storeId);
+            } catch (NoSuchEntityException) {
+                continue;
+            } catch (Throwable) {
+                return null;
+            }
+            if ($product instanceof Product) {
+                return $product;
+            }
+        }
+        return null;
     }
 
     /**
