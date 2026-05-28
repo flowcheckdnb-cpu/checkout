@@ -1,5 +1,5 @@
 {
-    "name": "magebit/module-abandoned-cart",
+    "name": "flowcheckdnb-cpu/module-abandoned-cart",
     "description": "Magebit AbandonedCart — AI brand-voice abandoned-cart and low-stock recovery emails",
     "type": "magento2-module",
     "license": "proprietary",
