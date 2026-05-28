@@ -68,7 +68,7 @@ class Client
             $this->curl->post($url, $body);
         } catch (\Exception $e) {
             throw new GeminiException(
-                new Phrase('Gemini HTTP error: %1', [$e->getMessage()]),
+                new Phrase('Gemini HTTP error: %1', [$this->redact($e->getMessage())]),
                 $e,
             );
         }
@@ -78,7 +78,7 @@ class Client
 
         if ($status < 200 || $status >= 300) {
             throw new GeminiException(
-                new Phrase('Gemini API returned HTTP %1: %2', [$status, $responseBody]),
+                new Phrase('Gemini API returned HTTP %1: %2', [$status, $this->redact($responseBody)]),
             );
         }
 
@@ -88,5 +88,16 @@ class Client
         }
 
         return $decoded;
+    }
+
+    /**
+     * Strip the `?key=…` segment from anything that might land in logs.
+     *
+     * @param string $message
+     * @return string
+     */
+    private function redact(string $message): string
+    {
+        return (string) preg_replace('/key=[A-Za-z0-9_\-]+/', 'key=[REDACTED]', $message);
     }
 }

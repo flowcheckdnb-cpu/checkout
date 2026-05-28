@@ -104,8 +104,11 @@ class PromptBuilder
             '- Subject: ≤60 characters, attention-grabbing, no clickbait.',
             '- Preheader: ≤90 characters, complements the subject.',
             '- Body: 2-3 short paragraphs of markdown.'
-                . ' Use plain paragraphs, **bold** for emphasis, [links](url) sparingly.'
+                . ' Use plain paragraphs, **bold** for emphasis.'
                 . ' No headings, no images, no bullet lists unless they read naturally.',
+            '- Do NOT include any links, URLs, button text, or "click here" phrases in the body.'
+                . ' A "Return to your cart" CTA button is added by the email template separately —'
+                . ' never write your own. Refer to the cart conceptually only.',
             '- Never fabricate discounts, stock numbers, shipping promises,'
                 . ' or product claims not provided in the user content.',
             '- Address the customer by first name when possible.',
