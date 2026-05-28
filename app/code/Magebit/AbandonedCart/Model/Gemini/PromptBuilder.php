@@ -24,6 +24,21 @@ class PromptBuilder
     ];
 
     /**
+     * Distinct rhetorical approaches the AI rotates through to avoid stale phrasing.
+     * One is picked at random per send.
+     */
+    private const STYLE_VARIANTS = [
+        'Open with a curious question that invites reflection — no greeting line first.',
+        'Lead with a vivid observation about the cart contents. Skip the greeting entirely.',
+        'Be playful and a touch cheeky. Light humor, a bit of personality. Avoid corporate phrasing.',
+        'Be unusually brief — three tight sentences, every word earned. Respect the reader\'s time.',
+        'Open with a small, relatable moment (a thought, a scene, a Tuesday afternoon).'
+            . ' Make it feel human.',
+        'Write like a friend texting. Casual, contractions, warm. The customer is not a "valued shopper".',
+        'Lead with a direct, confident statement of what you noticed. No fluff, no greeting boilerplate.',
+    ];
+
+    /**
      * Build the full Gemini API request payload.
      *
      * @param string $stageKey
@@ -46,6 +61,8 @@ class PromptBuilder
         string $currency,
         ?string $couponCode = null,
     ): array {
+        $style = $this->pickStyle();
+
         return [
             'systemInstruction' => [
                 'parts' => [['text' => $this->systemText($voice)]],
@@ -61,6 +78,7 @@ class PromptBuilder
                         $cartSubtotal,
                         $currency,
                         $couponCode,
+                        $style,
                     ),
                 ]],
             ]],
@@ -75,7 +93,7 @@ class PromptBuilder
                     ],
                     'required' => ['subject', 'preheader', 'body_markdown'],
                 ],
-                'temperature' => 0.7,
+                'temperature' => 0.95,
             ],
         ];
     }
@@ -114,7 +132,13 @@ class PromptBuilder
                 . ' never write your own. Refer to the cart conceptually only.',
             '- Never fabricate discounts, stock numbers, shipping promises,'
                 . ' or product claims not provided in the user content.',
-            '- Address the customer by first name when possible.',
+            '- Anti-staleness: do NOT default to greeting-line openings like "Hey {name}",'
+                . ' "Hi there", "Hello {name}", or "Psst...".'
+                . ' The "Style for this email" hint in the user content tells you which approach to take.',
+            '- The customer\'s first name may be referenced ONCE at most, naturally.'
+                . ' Many emails should not use it at all.',
+            '- Vary subject line shapes (questions, statements, observations, mid-thought fragments).'
+                . ' Never start a subject with the customer\'s name.',
         ]);
     }
 
@@ -128,6 +152,7 @@ class PromptBuilder
      * @param float $cartSubtotal
      * @param string $currency
      * @param string|null $couponCode
+     * @param string $style Random rhetorical-approach hint for this email.
      * @return string
      */
     private function userText(
@@ -138,12 +163,16 @@ class PromptBuilder
         float $cartSubtotal,
         string $currency,
         ?string $couponCode = null,
+        string $style = '',
     ): string {
         $descriptor = self::STAGE_DESCRIPTORS[$stageKey] ?? 'general abandoned-cart recovery email.';
         $name = $customerFirstName !== '' ? $customerFirstName : 'there';
 
         $lines = [];
         $lines[] = "Stage: {$descriptor}";
+        if ($style !== '') {
+            $lines[] = "Style for this email: {$style}";
+        }
         $lines[] = "Customer first name: {$name}";
         $lines[] = "Store: {$storeName}";
         $lines[] = '';
@@ -165,5 +194,15 @@ class PromptBuilder
         $lines[] = 'Write the recovery email now. Respond with JSON only.';
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Randomly pick one rhetorical approach for this email.
+     *
+     * @return string
+     */
+    private function pickStyle(): string
+    {
+        return self::STYLE_VARIANTS[array_rand(self::STYLE_VARIANTS)];
     }
 }
