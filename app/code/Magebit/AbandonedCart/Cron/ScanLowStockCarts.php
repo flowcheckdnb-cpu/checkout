@@ -26,6 +26,7 @@ class ScanLowStockCarts
 {
     private const STAGE_PREFIX = 'low_stock';
     private const RECOVERY_ROUTE = 'abandonedcart/recovery/index';
+    private const UNSUBSCRIBE_ROUTE = 'abandonedcart/unsubscribe/index';
 
     /**
      * @param StoreManagerInterface $storeManager
@@ -124,6 +125,9 @@ class ScanLowStockCarts
             $recoveryUrl = $store->getUrl(self::RECOVERY_ROUTE, [
                 '_query' => ['t' => $recoveryToken],
             ]);
+            $unsubscribeUrl = $store->getUrl(self::UNSUBSCRIBE_ROUTE, [
+                '_query' => ['t' => $recoveryToken],
+            ]);
 
             $generated = $this->generator->generate(
                 self::STAGE_PREFIX,
@@ -138,6 +142,7 @@ class ScanLowStockCarts
 
             $extraVars = [
                 'recovery_url' => $recoveryUrl,
+                'unsubscribe_url' => $unsubscribeUrl,
                 'coupon_code' => $coupon !== null ? $coupon->code : '',
                 'coupon_expires_at' => $coupon !== null && $coupon->expiresAtUnix !== null
                     ? date('M j, Y', $coupon->expiresAtUnix)

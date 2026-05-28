@@ -98,6 +98,10 @@ class LowStockCartFinder
             if (!$cart instanceof Quote) {
                 continue;
             }
+            $emailRaw = $cart->getCustomerEmail();
+            if (is_string($emailRaw) && $this->logRepository->isUnsubscribed($emailRaw, $storeId)) {
+                continue;
+            }
             $eligible[] = $cart;
         }
 

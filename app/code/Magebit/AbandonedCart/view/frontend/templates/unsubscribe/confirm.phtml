@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+/** @var \Magento\Framework\View\Element\Template $block */
+/** @var \Magento\Framework\Escaper $escaper */
+
+$registry = $block->getData('registry');
+if (!$registry instanceof \Magento\Framework\Registry) {
+    $registry = \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Framework\Registry::class);
+}
+$emailRaw = $registry->registry('magebit_abandonedcart_unsubscribed_email');
+$email = is_string($emailRaw) ? $emailRaw : '';
+?>
+
+<div style="max-width: 560px; margin: 80px auto; padding: 32px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
+    <h1 style="font-size: 24px; margin: 0 0 16px;"><?= $escaper->escapeHtml(__("You're unsubscribed")) ?></h1>
+    <p style="font-size: 16px; color: #4b5563; margin: 0 0 8px;">
+        <?php if ($email !== ''): ?>
+            <?= $escaper->escapeHtml(__('We have stopped sending recovery emails to <strong>%1</strong>.', $email), ['strong']) ?>
+        <?php else: ?>
+            <?= $escaper->escapeHtml(__('We have stopped sending recovery emails to this address.')) ?>
+        <?php endif; ?>
+    </p>
+    <p style="font-size: 14px; color: #6b7280; margin: 24px 0 0;">
+        <?= $escaper->escapeHtml(__('Changed your mind? Contact us and we will re-enable them.')) ?>
+    </p>
+</div>

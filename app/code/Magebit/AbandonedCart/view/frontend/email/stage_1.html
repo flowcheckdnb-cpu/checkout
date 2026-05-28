@@ -4,7 +4,8 @@
 "var preheader":"Preheader (preview text)",
 "var body_html":"AI-generated body HTML",
 "var customer_name":"Customer first name",
-"var recovery_url":"One-click cart recovery link"
+"var recovery_url":"One-click cart recovery link",
+"var unsubscribe_url":"One-click unsubscribe link"
 } @-->
 <!--@styles
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; color: #2c2c2c; line-height: 1.5; }
@@ -32,6 +33,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
     <p class="cta-fallback">
         Trouble with the button? Copy and paste this link into your browser:<br>
         {{var recovery_url}}
+    </p>
+    <p style="font-size:11px;color:#9ca3af;text-align:center;margin:32px 0 0">
+        Don't want recovery emails? <a href="{{var unsubscribe_url}}" style="color:#9ca3af;text-decoration:underline">Unsubscribe</a>.
     </p>
 </div>
 

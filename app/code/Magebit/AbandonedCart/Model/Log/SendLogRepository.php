@@ -117,4 +117,42 @@ class SendLogRepository
         }
         return $row;
     }
+
+    /**
+     * Mark every log row for the given (email, store) pair as unsubscribed.
+     *
+     * @param string $email
+     * @param int $storeId
+     * @return void
+     */
+    public function markUnsubscribed(string $email, int $storeId): void
+    {
+        $connection = $this->resourceConnection->getConnection();
+        $table = $this->resourceConnection->getTableName('magebit_abandoned_cart_log');
+        $connection->update(
+            $table,
+            ['unsubscribed' => 1],
+            ['customer_email = ?' => $email, 'store_id = ?' => $storeId],
+        );
+    }
+
+    /**
+     * Whether any prior log row for this (email, store) pair has been marked unsubscribed.
+     *
+     * @param string $email
+     * @param int $storeId
+     * @return bool
+     */
+    public function isUnsubscribed(string $email, int $storeId): bool
+    {
+        if ($email === '') {
+            return false;
+        }
+        $collection = $this->collectionFactory->create();
+        $collection->addFieldToFilter('customer_email', ['eq' => $email]);
+        $collection->addFieldToFilter('store_id', ['eq' => $storeId]);
+        $collection->addFieldToFilter('unsubscribed', ['eq' => 1]);
+        $collection->setPageSize(1);
+        return $collection->getSize() > 0;
+    }
 }

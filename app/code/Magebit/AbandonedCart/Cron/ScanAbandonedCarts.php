@@ -27,6 +27,7 @@ class ScanAbandonedCarts
     private const STAGES = ['stage_1', 'stage_2', 'stage_3'];
     private const STAGE_WITH_COUPON = 'stage_3';
     private const RECOVERY_ROUTE = 'abandonedcart/recovery/index';
+    private const UNSUBSCRIBE_ROUTE = 'abandonedcart/unsubscribe/index';
 
     /**
      * @param StoreManagerInterface $storeManager
@@ -125,6 +126,9 @@ class ScanAbandonedCarts
             $recoveryUrl = $store->getUrl(self::RECOVERY_ROUTE, [
                 '_query' => ['t' => $recoveryToken],
             ]);
+            $unsubscribeUrl = $store->getUrl(self::UNSUBSCRIBE_ROUTE, [
+                '_query' => ['t' => $recoveryToken],
+            ]);
 
             $generated = $this->generator->generate(
                 $stageKey,
@@ -139,6 +143,7 @@ class ScanAbandonedCarts
 
             $extraVars = [
                 'recovery_url' => $recoveryUrl,
+                'unsubscribe_url' => $unsubscribeUrl,
                 'coupon_code' => $coupon !== null ? $coupon->code : '',
                 'coupon_expires_at' => $coupon !== null && $coupon->expiresAtUnix !== null
                     ? date('M j, Y', $coupon->expiresAtUnix)

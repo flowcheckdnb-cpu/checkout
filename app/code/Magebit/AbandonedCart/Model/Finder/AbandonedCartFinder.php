@@ -76,6 +76,10 @@ class AbandonedCartFinder
             if ($this->logRepository->hasSent($quoteId, $stageKey)) {
                 continue;
             }
+            $emailRaw = $quote->getCustomerEmail();
+            if (is_string($emailRaw) && $this->logRepository->isUnsubscribed($emailRaw, $storeId)) {
+                continue;
+            }
             $eligible[] = $quote;
         }
 
