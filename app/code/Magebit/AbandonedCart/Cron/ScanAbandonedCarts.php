@@ -120,7 +120,8 @@ class ScanAbandonedCarts
                 return;
             }
 
-            $coupon = $this->maybeIssueCoupon($stageKey, $storeId);
+            $prefixHint = $firstName !== '' ? $firstName : $this->emailLocalPart($emailRaw);
+            $coupon = $this->maybeIssueCoupon($stageKey, $storeId, $prefixHint);
 
             $recoveryToken = bin2hex(random_bytes(32));
             $recoveryUrl = $store->getUrl(self::RECOVERY_ROUTE, [
@@ -185,9 +186,10 @@ class ScanAbandonedCarts
      *
      * @param string $stageKey
      * @param int $storeId
+     * @param string $prefixHint Customer-derived hint used to personalize the code.
      * @return GeneratedCoupon|null
      */
-    private function maybeIssueCoupon(string $stageKey, int $storeId): ?GeneratedCoupon
+    private function maybeIssueCoupon(string $stageKey, int $storeId, string $prefixHint): ?GeneratedCoupon
     {
         if ($stageKey !== self::STAGE_WITH_COUPON) {
             return null;
@@ -197,7 +199,22 @@ class ScanAbandonedCarts
             return null;
         }
         $ttlHours = $this->config->getStage3CouponTtlHours($storeId);
-        return $this->couponIssuer->issue($ruleId, $ttlHours);
+        return $this->couponIssuer->issue($ruleId, $ttlHours, $prefixHint);
+    }
+
+    /**
+     * Pull the local-part from an email address for use as a coupon prefix fallback.
+     *
+     * @param string $email
+     * @return string
+     */
+    private function emailLocalPart(string $email): string
+    {
+        $at = strpos($email, '@');
+        if ($at === false) {
+            return $email;
+        }
+        return substr($email, 0, $at);
     }
 
     /**

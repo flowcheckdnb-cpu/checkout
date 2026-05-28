@@ -119,7 +119,8 @@ class ScanLowStockCarts
                 return;
             }
 
-            $coupon = $this->maybeIssueCoupon($storeId);
+            $prefixHint = $firstName !== '' ? $firstName : $this->emailLocalPart($emailRaw);
+            $coupon = $this->maybeIssueCoupon($storeId, $prefixHint);
 
             $recoveryToken = bin2hex(random_bytes(32));
             $recoveryUrl = $store->getUrl(self::RECOVERY_ROUTE, [
@@ -182,16 +183,32 @@ class ScanLowStockCarts
      * Mint a coupon from the low-stock cart price rule, if configured.
      *
      * @param int $storeId
+     * @param string $prefixHint Customer-derived hint used to personalize the code.
      * @return GeneratedCoupon|null
      */
-    private function maybeIssueCoupon(int $storeId): ?GeneratedCoupon
+    private function maybeIssueCoupon(int $storeId, string $prefixHint): ?GeneratedCoupon
     {
         $ruleId = $this->config->getLowStockCouponRuleId($storeId);
         if ($ruleId === 0) {
             return null;
         }
         $ttlHours = $this->config->getLowStockCouponTtlHours($storeId);
-        return $this->couponIssuer->issue($ruleId, $ttlHours);
+        return $this->couponIssuer->issue($ruleId, $ttlHours, $prefixHint);
+    }
+
+    /**
+     * Pull the local-part from an email address for use as a coupon prefix fallback.
+     *
+     * @param string $email
+     * @return string
+     */
+    private function emailLocalPart(string $email): string
+    {
+        $at = strpos($email, '@');
+        if ($at === false) {
+            return $email;
+        }
+        return substr($email, 0, $at);
     }
 
     /**
