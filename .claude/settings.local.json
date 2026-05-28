@@ -20,7 +20,17 @@
       "Bash(python3 -c \"import sys, json; d = json.load\\(sys.stdin\\); msgs = d.get\\('messages', []\\); print\\(f'Total messages: {len\\(msgs\\)}'\\); [print\\(f\\\\\"  [{m['ID']}] {m['Subject']} → {m['To'][0]['Address']}\\\\\"\\) for m in msgs[:3]]\")",
       "Bash(python3 -c \"import sys, json; d = json.load\\(sys.stdin\\); print\\(d.get\\('HTML', ''\\)[:1500]\\)\")",
       "Bash(python3 -c \"import sys, json; d = json.load\\(sys.stdin\\); html = d.get\\('HTML', ''\\); import re; links = re.findall\\(r'href=\\\\\"\\([^\\\\\"]*abandonedcart[^\\\\\"]*\\)\\\\\"', html\\); print\\('Recovery links found:', len\\(links\\)\\); [print\\(' →', l\\) for l in links]\")",
-      "Bash(curl -sI -k \"https://onsite-test.docker/abandonedcart/recovery/index/?t=b04722b9563feab3f2fe77e09a2aeecde3b80d7ccd0b556a19905d0039b6a1a9\")"
+      "Bash(curl -sI -k \"https://onsite-test.docker/abandonedcart/recovery/index/?t=b04722b9563feab3f2fe77e09a2aeecde3b80d7ccd0b556a19905d0039b6a1a9\")",
+      "Bash(git tag *)",
+      "Bash(python3 -c ' *)",
+      "Bash(git -C /home/bootcamp/projects/test log --all -p -S 'AIzaSy')",
+      "Bash(curl -sI -k https://onsite-test.docker/abandonedcart/unsubscribe/index/?t=73b605a97eb7d490f6b8e4940bcdb7a6b94efdc8e50710b20355a1867de5ea6c)",
+      "Bash(curl -sf -k \"https://onsite-test.docker/abandonedcart/unsubscribe/index/?t=73b605a97eb7d490f6b8e4940bcdb7a6b94efdc8e50710b20355a1867de5ea6c\")",
+      "Bash(curl -sI -k \"https://onsite-test.docker/admin/magebit_abandonedcart/sendlog/index\")",
+      "Bash(curl -sI -k \"https://onsite-test.docker/admin/dashboard/\")",
+      "Bash(curl -sI -k \"https://onsite-test.docker/admin/magebit_abandonedcart/sendlog/testsend\")",
+      "Bash(python3 -c \"import sys, json; print\\(f'  {json.load\\(sys.stdin\\)[\\\\\"total\\\\\"]} messages'\\)\")",
+      "Bash(/home/bootcamp/projects/test/dev.sh shell *)"
     ]
   }
 }
