@@ -12,6 +12,7 @@ use Magebit\AbandonedCart\Model\Finder\AbandonedCartFinder;
 use Magebit\AbandonedCart\Model\Log\SendLogRepository;
 use Magebit\AbandonedCart\Service\Coupon\CouponIssuer;
 use Magebit\AbandonedCart\Service\Coupon\GeneratedCoupon;
+use Magento\Framework\UrlInterface;
 use Magento\Quote\Model\Quote;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
@@ -113,7 +114,7 @@ class ScanAbandonedCarts
             $currencyRaw = $quote->getQuoteCurrencyCode();
             $currency = is_string($currencyRaw) ? $currencyRaw : '';
 
-            $items = $this->extractItems($quote);
+            $items = $this->extractItems($quote, $store);
 
             $template = $this->config->getStageTemplate($stageKey, $storeId);
             if ($template === '') {
@@ -157,6 +158,8 @@ class ScanAbandonedCarts
                 $firstName,
                 $template,
                 $generated,
+                $items,
+                $currency,
                 $extraVars,
             );
 
@@ -218,22 +221,39 @@ class ScanAbandonedCarts
     }
 
     /**
-     * Build CartItemSummary DTOs from quote items.
+     * Build CartItemSummary DTOs from quote items, including image + URL pulled from the linked product.
      *
      * @param Quote $quote
+     * @param Store $store
      * @return CartItemSummary[]
      */
-    private function extractItems(Quote $quote): array
+    private function extractItems(Quote $quote, Store $store): array
     {
+        $mediaBase = $store->getBaseUrl(UrlInterface::URL_TYPE_MEDIA);
         $items = [];
         foreach ($quote->getAllVisibleItems() as $item) {
             $nameRaw = $item->getName();
             $qtyRaw = $item->getQty();
             $rowRaw = $item->getRowTotal();
+            $product = $item->getProduct();
+            $imageUrl = '';
+            $productUrl = '';
+            if ($product !== null) {
+                $thumbRaw = $product->getData('thumbnail');
+                if (is_string($thumbRaw) && $thumbRaw !== '' && $thumbRaw !== 'no_selection') {
+                    $imageUrl = rtrim($mediaBase, '/') . '/catalog/product/' . ltrim($thumbRaw, '/');
+                }
+                $urlRaw = $product->getProductUrl();
+                if (is_string($urlRaw)) {
+                    $productUrl = $urlRaw;
+                }
+            }
             $items[] = new CartItemSummary(
                 name: is_string($nameRaw) ? $nameRaw : '',
                 qty: is_numeric($qtyRaw) ? (float) $qtyRaw : 0.0,
                 rowTotal: is_numeric($rowRaw) ? (float) $rowRaw : 0.0,
+                imageUrl: $imageUrl,
+                productUrl: $productUrl,
             );
         }
         return $items;
