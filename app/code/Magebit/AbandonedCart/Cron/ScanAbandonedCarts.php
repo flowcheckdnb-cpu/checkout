@@ -11,6 +11,7 @@ use Magebit\AbandonedCart\Model\Email\EmailDispatcher;
 use Magebit\AbandonedCart\Model\Finder\AbandonedCartFinder;
 use Magebit\AbandonedCart\Model\Log\SendLogRepository;
 use Magento\Quote\Model\Quote;
+use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -21,6 +22,7 @@ use Throwable;
 class ScanAbandonedCarts
 {
     private const STAGE = 'stage_1';
+    private const RECOVERY_ROUTE = 'abandonedcart/recovery/index';
 
     /**
      * @param StoreManagerInterface $storeManager
@@ -50,6 +52,9 @@ class ScanAbandonedCarts
     public function execute(): void
     {
         foreach ($this->storeManager->getStores() as $store) {
+            if (!$store instanceof Store) {
+                continue;
+            }
             $storeIdRaw = $store->getId();
             if (!is_scalar($storeIdRaw)) {
                 continue;
@@ -59,10 +64,8 @@ class ScanAbandonedCarts
                 continue;
             }
 
-            $storeName = (string) $store->getName();
-
             foreach ($this->finder->findEligible(self::STAGE, $storeId) as $quote) {
-                $this->processQuote($quote, $storeId, $storeName);
+                $this->processQuote($quote, $store);
             }
         }
     }
@@ -71,13 +74,15 @@ class ScanAbandonedCarts
      * Generate, send, and log one recovery email for one quote.
      *
      * @param Quote $quote
-     * @param int $storeId
-     * @param string $storeName
+     * @param Store $store
      * @return void
      */
-    private function processQuote(Quote $quote, int $storeId, string $storeName): void
+    private function processQuote(Quote $quote, Store $store): void
     {
         try {
+            $storeId = (int) $store->getId();
+            $storeName = (string) $store->getName();
+
             $quoteIdRaw = $quote->getId();
             if (!is_scalar($quoteIdRaw)) {
                 return;
@@ -105,6 +110,11 @@ class ScanAbandonedCarts
                 return;
             }
 
+            $recoveryToken = bin2hex(random_bytes(32));
+            $recoveryUrl = $store->getUrl(self::RECOVERY_ROUTE, [
+                '_query' => ['t' => $recoveryToken],
+            ]);
+
             $generated = $this->generator->generate(
                 self::STAGE,
                 $storeId,
@@ -121,9 +131,10 @@ class ScanAbandonedCarts
                 $firstName,
                 $template,
                 $generated,
+                ['recovery_url' => $recoveryUrl],
             );
 
-            $this->writeLog($quoteId, $emailRaw, $storeId, $generated->aiGenerated);
+            $this->writeLog($quoteId, $emailRaw, $storeId, $generated->aiGenerated, $recoveryToken);
         } catch (Throwable $e) {
             $this->logger->error(
                 'Abandoned cart send failed.',
@@ -164,12 +175,18 @@ class ScanAbandonedCarts
      * @param string $email
      * @param int $storeId
      * @param bool $aiGenerated
+     * @param string $recoveryToken
      * @return void
      * @throws \Magento\Framework\Exception\AlreadyExistsException
      * @throws \Exception
      */
-    private function writeLog(int $quoteId, string $email, int $storeId, bool $aiGenerated): void
-    {
+    private function writeLog(
+        int $quoteId,
+        string $email,
+        int $storeId,
+        bool $aiGenerated,
+        string $recoveryToken,
+    ): void {
         $log = $this->logRepository->create();
         $log->setQuoteId($quoteId);
         $log->setCustomerEmail($email);
@@ -178,7 +195,7 @@ class ScanAbandonedCarts
         $log->setStageKey(self::STAGE);
         $log->setStatus($aiGenerated ? 'sent' : 'fallback');
         $log->setAiGenerated($aiGenerated ? 1 : 0);
-        $log->setRecoveryToken(bin2hex(random_bytes(32)));
+        $log->setRecoveryToken($recoveryToken);
         $this->logRepository->save($log);
     }
 }

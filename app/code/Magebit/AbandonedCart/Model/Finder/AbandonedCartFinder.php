@@ -70,6 +70,9 @@ class AbandonedCartFinder
             if ($quoteId === 0) {
                 continue;
             }
+            if ($this->logRepository->hasRecovered($quoteId)) {
+                continue;
+            }
             if ($this->logRepository->hasSent($quoteId, $stageKey)) {
                 continue;
             }
