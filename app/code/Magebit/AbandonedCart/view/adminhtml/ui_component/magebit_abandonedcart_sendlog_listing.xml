@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<listing xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <argument name="data" xsi:type="array">
+        <item name="js_config" xsi:type="array">
+            <item name="provider" xsi:type="string">magebit_abandonedcart_sendlog_listing.magebit_abandonedcart_sendlog_listing_data_source</item>
+        </item>
+    </argument>
+    <settings>
+        <spinner>magebit_abandonedcart_sendlog_listing_columns</spinner>
+        <deps>
+            <dep>magebit_abandonedcart_sendlog_listing.magebit_abandonedcart_sendlog_listing_data_source</dep>
+        </deps>
+    </settings>
+
+    <dataSource name="magebit_abandonedcart_sendlog_listing_data_source" component="Magento_Ui/js/grid/provider">
+        <settings>
+            <storageConfig>
+                <param name="indexField" xsi:type="string">id</param>
+            </storageConfig>
+            <updateUrl path="mui/index/render"/>
+        </settings>
+        <aclResource>Magebit_AbandonedCart::log</aclResource>
+        <dataProvider class="Magebit\AbandonedCart\Ui\DataProvider\SendLogDataProvider"
+                      name="magebit_abandonedcart_sendlog_listing_data_source">
+            <settings>
+                <requestFieldName>id</requestFieldName>
+                <primaryFieldName>id</primaryFieldName>
+            </settings>
+        </dataProvider>
+    </dataSource>
+
+    <listingToolbar name="listing_top">
+        <settings>
+            <sticky>true</sticky>
+        </settings>
+        <bookmark name="bookmarks"/>
+        <columnsControls name="columns_controls"/>
+        <exportButton name="export_button">
+            <settings>
+                <options>
+                    <option name="csv" xsi:type="array">
+                        <item name="value" xsi:type="string">csv</item>
+                        <item name="label" xsi:type="string" translate="true">CSV</item>
+                    </option>
+                    <option name="xml" xsi:type="array">
+                        <item name="value" xsi:type="string">xml</item>
+                        <item name="label" xsi:type="string" translate="true">Excel XML</item>
+                    </option>
+                </options>
+            </settings>
+        </exportButton>
+        <filterSearch name="fulltext"/>
+        <filters name="listing_filters"/>
+        <massaction name="listing_massaction">
+            <action name="delete">
+                <settings>
+                    <confirm>
+                        <message translate="true">Delete the selected log rows?</message>
+                        <title translate="true">Delete</title>
+                    </confirm>
+                    <url path="magebit_abandonedcart/sendlog/massDelete"/>
+                    <type>delete</type>
+                    <label translate="true">Delete</label>
+                </settings>
+            </action>
+            <action name="mark_unrecovered">
+                <settings>
+                    <url path="magebit_abandonedcart/sendlog/massMarkUnrecovered"/>
+                    <type>mark_unrecovered</type>
+                    <label translate="true">Mark Unrecovered</label>
+                </settings>
+            </action>
+        </massaction>
+        <paging name="listing_paging"/>
+    </listingToolbar>
+
+    <columns name="magebit_abandonedcart_sendlog_listing_columns">
+        <selectionsColumn name="ids">
+            <settings>
+                <indexField>id</indexField>
+            </settings>
+        </selectionsColumn>
+
+        <column name="id">
+            <settings>
+                <filter>textRange</filter>
+                <sorting>desc</sorting>
+                <label translate="true">ID</label>
+            </settings>
+        </column>
+
+        <column name="sent_at" class="Magento\Ui\Component\Listing\Columns\Date"
+                component="Magento_Ui/js/grid/columns/date">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Sent At</label>
+            </settings>
+        </column>
+
+        <column name="email_type" component="Magento_Ui/js/grid/columns/select">
+            <settings>
+                <filter>select</filter>
+                <options class="Magebit\AbandonedCart\Ui\Component\Listing\Column\EmailType"/>
+                <dataType>select</dataType>
+                <label translate="true">Type</label>
+            </settings>
+        </column>
+
+        <column name="customer_email">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Recipient</label>
+            </settings>
+        </column>
+
+        <column name="store_id" class="Magento\Store\Ui\Component\Listing\Column\Store">
+            <settings>
+                <bodyTmpl>ui/grid/cells/html</bodyTmpl>
+                <label translate="true">Store</label>
+                <sortable>false</sortable>
+            </settings>
+        </column>
+
+        <column name="status" component="Magento_Ui/js/grid/columns/select">
+            <settings>
+                <filter>select</filter>
+                <options class="Magebit\AbandonedCart\Ui\Component\Listing\Column\Status"/>
+                <dataType>select</dataType>
+                <label translate="true">Status</label>
+            </settings>
+        </column>
+
+        <column name="ai_generated">
+            <settings>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <options class="Magento\Config\Model\Config\Source\Yesno"/>
+                <label translate="true">AI?</label>
+            </settings>
+        </column>
+
+        <column name="coupon_code">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Coupon</label>
+            </settings>
+        </column>
+
+        <column name="recovered_at" class="Magento\Ui\Component\Listing\Columns\Date"
+                component="Magento_Ui/js/grid/columns/date">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Recovered At</label>
+                <visible>true</visible>
+            </settings>
+        </column>
+
+        <column name="unsubscribed">
+            <settings>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <options class="Magento\Config\Model\Config\Source\Yesno"/>
+                <label translate="true">Unsubscribed?</label>
+            </settings>
+        </column>
+    </columns>
+</listing>
