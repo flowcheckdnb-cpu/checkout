@@ -47,6 +47,7 @@ class BrandVoiceEmailGenerator
      * @param CartItemSummary[] $cartItems
      * @param float $cartSubtotal
      * @param string $currency
+     * @param string|null $couponCode
      * @return GeneratedEmail
      */
     public function generate(
@@ -57,6 +58,7 @@ class BrandVoiceEmailGenerator
         array $cartItems,
         float $cartSubtotal,
         string $currency,
+        ?string $couponCode = null,
     ): GeneratedEmail {
         $profile = $this->profileFactory->forStore($storeId);
 
@@ -73,6 +75,7 @@ class BrandVoiceEmailGenerator
                 $cartItems,
                 $cartSubtotal,
                 $currency,
+                $couponCode,
             );
             $response = $this->client->send($storeId, $payload);
             return $this->parser->parse($response);

@@ -10,6 +10,8 @@ use Magebit\AbandonedCart\Model\Email\CartItemSummary;
 use Magebit\AbandonedCart\Model\Email\EmailDispatcher;
 use Magebit\AbandonedCart\Model\Finder\AbandonedCartFinder;
 use Magebit\AbandonedCart\Model\Log\SendLogRepository;
+use Magebit\AbandonedCart\Service\Coupon\CouponIssuer;
+use Magebit\AbandonedCart\Service\Coupon\GeneratedCoupon;
 use Magento\Quote\Model\Quote;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
@@ -17,11 +19,13 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
- * Cron entry point — scans for stage_1-eligible quotes and dispatches recovery emails.
+ * Cron entry point — scans for stage-eligible quotes across all configured stages
+ * and dispatches the appropriate recovery email.
  */
 class ScanAbandonedCarts
 {
-    private const STAGE = 'stage_1';
+    private const STAGES = ['stage_1', 'stage_2', 'stage_3'];
+    private const STAGE_WITH_COUPON = 'stage_3';
     private const RECOVERY_ROUTE = 'abandonedcart/recovery/index';
 
     /**
@@ -31,6 +35,7 @@ class ScanAbandonedCarts
      * @param BrandVoiceEmailGenerator $generator
      * @param EmailDispatcher $dispatcher
      * @param SendLogRepository $logRepository
+     * @param CouponIssuer $couponIssuer
      * @param LoggerInterface $logger
      */
     public function __construct(
@@ -40,12 +45,13 @@ class ScanAbandonedCarts
         private readonly BrandVoiceEmailGenerator $generator,
         private readonly EmailDispatcher $dispatcher,
         private readonly SendLogRepository $logRepository,
+        private readonly CouponIssuer $couponIssuer,
         private readonly LoggerInterface $logger,
     ) {
     }
 
     /**
-     * Cron job entry point. Iterates stores, finds eligible quotes, dispatches one email per quote.
+     * Cron job entry point. Iterates stores × stages, finds eligible quotes, dispatches one email per pair.
      *
      * @return void
      */
@@ -64,20 +70,23 @@ class ScanAbandonedCarts
                 continue;
             }
 
-            foreach ($this->finder->findEligible(self::STAGE, $storeId) as $quote) {
-                $this->processQuote($quote, $store);
+            foreach (self::STAGES as $stageKey) {
+                foreach ($this->finder->findEligible($stageKey, $storeId) as $quote) {
+                    $this->processQuote($quote, $store, $stageKey);
+                }
             }
         }
     }
 
     /**
-     * Generate, send, and log one recovery email for one quote.
+     * Generate, send, and log one recovery email for one quote-stage pair.
      *
      * @param Quote $quote
      * @param Store $store
+     * @param string $stageKey
      * @return void
      */
-    private function processQuote(Quote $quote, Store $store): void
+    private function processQuote(Quote $quote, Store $store, string $stageKey): void
     {
         try {
             $storeId = (int) $store->getId();
@@ -105,10 +114,12 @@ class ScanAbandonedCarts
 
             $items = $this->extractItems($quote);
 
-            $template = $this->config->getStageTemplate(self::STAGE, $storeId);
+            $template = $this->config->getStageTemplate($stageKey, $storeId);
             if ($template === '') {
                 return;
             }
+
+            $coupon = $this->maybeIssueCoupon($stageKey, $storeId);
 
             $recoveryToken = bin2hex(random_bytes(32));
             $recoveryUrl = $store->getUrl(self::RECOVERY_ROUTE, [
@@ -116,14 +127,23 @@ class ScanAbandonedCarts
             ]);
 
             $generated = $this->generator->generate(
-                self::STAGE,
+                $stageKey,
                 $storeId,
                 $firstName,
                 $storeName,
                 $items,
                 $subtotal,
                 $currency,
+                $coupon?->code,
             );
+
+            $extraVars = ['recovery_url' => $recoveryUrl];
+            if ($coupon !== null) {
+                $extraVars['coupon_code'] = $coupon->code;
+                $extraVars['coupon_expires_at'] = $coupon->expiresAtUnix !== null
+                    ? date('M j, Y', $coupon->expiresAtUnix)
+                    : '';
+            }
 
             $this->dispatcher->send(
                 $storeId,
@@ -131,19 +151,48 @@ class ScanAbandonedCarts
                 $firstName,
                 $template,
                 $generated,
-                ['recovery_url' => $recoveryUrl],
+                $extraVars,
             );
 
-            $this->writeLog($quoteId, $emailRaw, $storeId, $generated->aiGenerated, $recoveryToken);
+            $this->writeLog(
+                $quoteId,
+                $emailRaw,
+                $storeId,
+                $stageKey,
+                $generated->aiGenerated,
+                $recoveryToken,
+                $coupon?->code,
+            );
         } catch (Throwable $e) {
             $this->logger->error(
                 'Abandoned cart send failed.',
                 [
                     'quote_id' => $quote->getId(),
+                    'stage' => $stageKey,
                     'error' => $e->getMessage(),
                 ],
             );
         }
+    }
+
+    /**
+     * For stage_3 (and any future stage in STAGE_WITH_COUPON), issue a unique coupon code.
+     *
+     * @param string $stageKey
+     * @param int $storeId
+     * @return GeneratedCoupon|null
+     */
+    private function maybeIssueCoupon(string $stageKey, int $storeId): ?GeneratedCoupon
+    {
+        if ($stageKey !== self::STAGE_WITH_COUPON) {
+            return null;
+        }
+        $ruleId = $this->config->getStage3CouponRuleId($storeId);
+        if ($ruleId === 0) {
+            return null;
+        }
+        $ttlHours = $this->config->getStage3CouponTtlHours($storeId);
+        return $this->couponIssuer->issue($ruleId, $ttlHours);
     }
 
     /**
@@ -174,8 +223,10 @@ class ScanAbandonedCarts
      * @param int $quoteId
      * @param string $email
      * @param int $storeId
+     * @param string $stageKey
      * @param bool $aiGenerated
      * @param string $recoveryToken
+     * @param string|null $couponCode
      * @return void
      * @throws \Magento\Framework\Exception\AlreadyExistsException
      * @throws \Exception
@@ -184,18 +235,23 @@ class ScanAbandonedCarts
         int $quoteId,
         string $email,
         int $storeId,
+        string $stageKey,
         bool $aiGenerated,
         string $recoveryToken,
+        ?string $couponCode,
     ): void {
         $log = $this->logRepository->create();
         $log->setQuoteId($quoteId);
         $log->setCustomerEmail($email);
         $log->setStoreId($storeId);
-        $log->setEmailType(self::STAGE);
-        $log->setStageKey(self::STAGE);
+        $log->setEmailType($stageKey);
+        $log->setStageKey($stageKey);
         $log->setStatus($aiGenerated ? 'sent' : 'fallback');
         $log->setAiGenerated($aiGenerated ? 1 : 0);
         $log->setRecoveryToken($recoveryToken);
+        if ($couponCode !== null) {
+            $log->setCouponCode($couponCode);
+        }
         $this->logRepository->save($log);
     }
 }

@@ -33,6 +33,7 @@ class PromptBuilder
      * @param CartItemSummary[] $cartItems
      * @param float $cartSubtotal
      * @param string $currency
+     * @param string|null $couponCode
      * @return array<string, mixed>
      */
     public function build(
@@ -43,6 +44,7 @@ class PromptBuilder
         array $cartItems,
         float $cartSubtotal,
         string $currency,
+        ?string $couponCode = null,
     ): array {
         return [
             'systemInstruction' => [
@@ -58,6 +60,7 @@ class PromptBuilder
                         $cartItems,
                         $cartSubtotal,
                         $currency,
+                        $couponCode,
                     ),
                 ]],
             ]],
@@ -124,6 +127,7 @@ class PromptBuilder
      * @param CartItemSummary[] $cartItems
      * @param float $cartSubtotal
      * @param string $currency
+     * @param string|null $couponCode
      * @return string
      */
     private function userText(
@@ -133,6 +137,7 @@ class PromptBuilder
         array $cartItems,
         float $cartSubtotal,
         string $currency,
+        ?string $couponCode = null,
     ): string {
         $descriptor = self::STAGE_DESCRIPTORS[$stageKey] ?? 'general abandoned-cart recovery email.';
         $name = $customerFirstName !== '' ? $customerFirstName : 'there';
@@ -150,6 +155,12 @@ class PromptBuilder
         }
         $lines[] = '';
         $lines[] = 'Cart subtotal: ' . $currency . ' ' . number_format($cartSubtotal, 2, '.', '');
+
+        if ($couponCode !== null && $couponCode !== '') {
+            $lines[] = '';
+            $lines[] = "Discount code (mention it naturally; the template displays it separately): {$couponCode}";
+        }
+
         $lines[] = '';
         $lines[] = 'Write the recovery email now. Respond with JSON only.';
 

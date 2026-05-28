@@ -7,4 +7,16 @@
               type="html"
               module="Magebit_AbandonedCart"
               area="frontend"/>
+    <template id="magebit_abandonedcart_stage_2"
+              label="Abandoned Cart - Stage 2 (Follow-up)"
+              file="stage_2.html"
+              type="html"
+              module="Magebit_AbandonedCart"
+              area="frontend"/>
+    <template id="magebit_abandonedcart_stage_3_with_coupon"
+              label="Abandoned Cart - Stage 3 (Final + Coupon)"
+              file="stage_3_with_coupon.html"
+              type="html"
+              module="Magebit_AbandonedCart"
+              area="frontend"/>
 </config>
