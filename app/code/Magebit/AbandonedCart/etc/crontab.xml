@@ -7,5 +7,10 @@
              method="execute">
             <schedule>*/15 * * * *</schedule>
         </job>
+        <job name="magebit_abandonedcart_scan_low_stock"
+             instance="Magebit\AbandonedCart\Cron\ScanLowStockCarts"
+             method="execute">
+            <schedule>*/15 * * * *</schedule>
+        </job>
     </group>
 </config>

@@ -5,13 +5,14 @@
 "var body_html":"AI-generated body HTML",
 "var customer_name":"Customer first name",
 "var recovery_url":"One-click cart recovery link",
-"var coupon_code":"Generated coupon code",
+"var coupon_code":"Generated coupon code (may be empty)",
 "var coupon_expires_at":"Human-readable coupon expiry"
 } @-->
 <!--@styles
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; color: #2c2c2c; line-height: 1.5; }
 .preheader { display: none; max-height: 0; overflow: hidden; visibility: hidden; opacity: 0; color: transparent; }
 .container { max-width: 600px; margin: 0 auto; padding: 24px; }
+.urgency-badge { display: inline-block; padding: 6px 14px; background: #fef2f2; color: #dc2626; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 24px; }
 .body p { margin: 0 0 16px; font-size: 16px; }
 .body strong { font-weight: 600; }
 .body a { color: #2563eb; text-decoration: underline; }
@@ -20,7 +21,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 .coupon-code { font-family: 'SF Mono', Consolas, Monaco, monospace; font-size: 28px; font-weight: 700; letter-spacing: 0.1em; color: #78350f; margin: 0 0 8px; }
 .coupon-expiry { font-size: 12px; color: #78350f; margin: 0; }
 .cta { text-align: center; margin: 32px 0; }
-.cta a { display: inline-block; padding: 14px 28px; background: #111827; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
+.cta a { display: inline-block; padding: 14px 28px; background: #dc2626; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
 .cta-fallback { font-size: 13px; color: #6b7280; word-break: break-all; }
 @-->
 
@@ -29,18 +30,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 <div class="preheader">{{var preheader}}</div>
 
 <div class="container">
+    <div style="text-align:center">
+        <span class="urgency-badge">Running Low</span>
+    </div>
     <div class="body">
         {{var body_html|raw}}
     </div>
 
+    {{depend coupon_code}}
     <div class="coupon">
         <p class="coupon-label">Your discount code</p>
         <p class="coupon-code">{{var coupon_code}}</p>
         <p class="coupon-expiry">Valid until {{var coupon_expires_at}}</p>
     </div>
+    {{/depend}}
 
     <div class="cta">
-        <a href="{{var recovery_url}}">Return to your cart &amp; apply code</a>
+        <a href="{{var recovery_url}}">Reserve your selection now</a>
     </div>
     <p class="cta-fallback">
         Trouble with the button? Copy and paste this link into your browser:<br>

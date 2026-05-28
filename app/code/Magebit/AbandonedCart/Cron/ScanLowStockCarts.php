@@ -8,7 +8,7 @@ use Magebit\AbandonedCart\Model\Config;
 use Magebit\AbandonedCart\Model\Email\BrandVoiceEmailGenerator;
 use Magebit\AbandonedCart\Model\Email\CartItemSummary;
 use Magebit\AbandonedCart\Model\Email\EmailDispatcher;
-use Magebit\AbandonedCart\Model\Finder\AbandonedCartFinder;
+use Magebit\AbandonedCart\Model\Finder\LowStockCartFinder;
 use Magebit\AbandonedCart\Model\Log\SendLogRepository;
 use Magebit\AbandonedCart\Service\Coupon\CouponIssuer;
 use Magebit\AbandonedCart\Service\Coupon\GeneratedCoupon;
@@ -19,19 +19,18 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
- * Cron entry point — scans for stage-eligible quotes across all configured stages
- * and dispatches the appropriate recovery email.
+ * Cron entry point — fires the low-stock urgency email (with coupon) when items in
+ * an active cart drop to or below the configured threshold.
  */
-class ScanAbandonedCarts
+class ScanLowStockCarts
 {
-    private const STAGES = ['stage_1', 'stage_2', 'stage_3'];
-    private const STAGE_WITH_COUPON = 'stage_3';
+    private const STAGE_PREFIX = 'low_stock';
     private const RECOVERY_ROUTE = 'abandonedcart/recovery/index';
 
     /**
      * @param StoreManagerInterface $storeManager
      * @param Config $config
-     * @param AbandonedCartFinder $finder
+     * @param LowStockCartFinder $finder
      * @param BrandVoiceEmailGenerator $generator
      * @param EmailDispatcher $dispatcher
      * @param SendLogRepository $logRepository
@@ -41,7 +40,7 @@ class ScanAbandonedCarts
     public function __construct(
         private readonly StoreManagerInterface $storeManager,
         private readonly Config $config,
-        private readonly AbandonedCartFinder $finder,
+        private readonly LowStockCartFinder $finder,
         private readonly BrandVoiceEmailGenerator $generator,
         private readonly EmailDispatcher $dispatcher,
         private readonly SendLogRepository $logRepository,
@@ -51,12 +50,14 @@ class ScanAbandonedCarts
     }
 
     /**
-     * Cron job entry point. Iterates stores × stages, finds eligible quotes, dispatches one email per pair.
+     * Cron job entry point. One urgency email per cart per dedup window (daily by default).
      *
      * @return void
      */
     public function execute(): void
     {
+        $stageKey = self::STAGE_PREFIX . ':' . date('Y-m-d');
+
         foreach ($this->storeManager->getStores() as $store) {
             if (!$store instanceof Store) {
                 continue;
@@ -70,16 +71,14 @@ class ScanAbandonedCarts
                 continue;
             }
 
-            foreach (self::STAGES as $stageKey) {
-                foreach ($this->finder->findEligible($stageKey, $storeId) as $quote) {
-                    $this->processQuote($quote, $store, $stageKey);
-                }
+            foreach ($this->finder->findEligible($storeId, $stageKey) as $quote) {
+                $this->processQuote($quote, $store, $stageKey);
             }
         }
     }
 
     /**
-     * Generate, send, and log one recovery email for one quote-stage pair.
+     * Generate, send, and log one urgency email for one quote.
      *
      * @param Quote $quote
      * @param Store $store
@@ -114,12 +113,12 @@ class ScanAbandonedCarts
 
             $items = $this->extractItems($quote);
 
-            $template = $this->config->getStageTemplate($stageKey, $storeId);
+            $template = $this->config->getLowStockTemplate($storeId);
             if ($template === '') {
                 return;
             }
 
-            $coupon = $this->maybeIssueCoupon($stageKey, $storeId);
+            $coupon = $this->maybeIssueCoupon($storeId);
 
             $recoveryToken = bin2hex(random_bytes(32));
             $recoveryUrl = $store->getUrl(self::RECOVERY_ROUTE, [
@@ -127,7 +126,7 @@ class ScanAbandonedCarts
             ]);
 
             $generated = $this->generator->generate(
-                $stageKey,
+                self::STAGE_PREFIX,
                 $storeId,
                 $firstName,
                 $storeName,
@@ -165,10 +164,9 @@ class ScanAbandonedCarts
             );
         } catch (Throwable $e) {
             $this->logger->error(
-                'Abandoned cart send failed.',
+                'Low-stock urgency send failed.',
                 [
                     'quote_id' => $quote->getId(),
-                    'stage' => $stageKey,
                     'error' => $e->getMessage(),
                 ],
             );
@@ -176,22 +174,18 @@ class ScanAbandonedCarts
     }
 
     /**
-     * For stage_3 (and any future stage in STAGE_WITH_COUPON), issue a unique coupon code.
+     * Mint a coupon from the low-stock cart price rule, if configured.
      *
-     * @param string $stageKey
      * @param int $storeId
      * @return GeneratedCoupon|null
      */
-    private function maybeIssueCoupon(string $stageKey, int $storeId): ?GeneratedCoupon
+    private function maybeIssueCoupon(int $storeId): ?GeneratedCoupon
     {
-        if ($stageKey !== self::STAGE_WITH_COUPON) {
-            return null;
-        }
-        $ruleId = $this->config->getStage3CouponRuleId($storeId);
+        $ruleId = $this->config->getLowStockCouponRuleId($storeId);
         if ($ruleId === 0) {
             return null;
         }
-        $ttlHours = $this->config->getStage3CouponTtlHours($storeId);
+        $ttlHours = $this->config->getLowStockCouponTtlHours($storeId);
         return $this->couponIssuer->issue($ruleId, $ttlHours);
     }
 
@@ -244,7 +238,7 @@ class ScanAbandonedCarts
         $log->setQuoteId($quoteId);
         $log->setCustomerEmail($email);
         $log->setStoreId($storeId);
-        $log->setEmailType($stageKey);
+        $log->setEmailType(self::STAGE_PREFIX);
         $log->setStageKey($stageKey);
         $log->setStatus($aiGenerated ? 'sent' : 'fallback');
         $log->setAiGenerated($aiGenerated ? 1 : 0);
