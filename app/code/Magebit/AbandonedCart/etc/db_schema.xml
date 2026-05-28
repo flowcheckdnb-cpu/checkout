@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <table name="magebit_abandoned_cart_log" resource="default" engine="innodb" charset="utf8mb4" collation="utf8mb4_unicode_ci"
+           comment="Magebit AbandonedCart — per-email send log + dedup">
+        <column xsi:type="int" name="id" unsigned="true" nullable="false" identity="true" comment="Primary key"/>
+        <column xsi:type="int" name="quote_id" unsigned="true" nullable="false" comment="Quote entity_id"/>
+        <column xsi:type="varchar" name="customer_email" length="255" nullable="false" comment="Recipient email"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" comment="Store scope"/>
+        <column xsi:type="varchar" name="email_type" length="32" nullable="false" comment="stage_1|stage_2|stage_3|low_stock"/>
+        <column xsi:type="varchar" name="stage_key" length="64" nullable="false" comment="Dedup key per email_type"/>
+        <column xsi:type="timestamp" name="sent_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="Send timestamp"/>
+        <column xsi:type="varchar" name="status" length="16" nullable="false" default="sent" comment="sent|failed|fallback"/>
+        <column xsi:type="varchar" name="provider_message_id" length="128" nullable="true" comment="SMTP/transport Message-ID"/>
+        <column xsi:type="varchar" name="coupon_code" length="64" nullable="true" comment="Generated coupon code"/>
+        <column xsi:type="varchar" name="recovery_token" length="128" nullable="false" comment="HMAC recovery token"/>
+        <column xsi:type="smallint" name="ai_generated" unsigned="true" nullable="false" default="1" comment="1=AI body, 0=static fallback"/>
+        <column xsi:type="timestamp" name="recovered_at" on_update="false" nullable="true" comment="Order-placed marker"/>
+        <column xsi:type="smallint" name="unsubscribed" unsigned="true" nullable="false" default="0" comment="1=unsubscribed"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="MAGEBIT_ABANDONED_CART_LOG_QUOTE_STAGE_KEY">
+            <column name="quote_id"/>
+            <column name="stage_key"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="MAGEBIT_ABANDONED_CART_LOG_RECOVERY_TOKEN">
+            <column name="recovery_token"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="MAGEBIT_ABANDONED_CART_LOG_QUOTE_ID_QUOTE_ENTITY_ID"
+                    table="magebit_abandoned_cart_log" column="quote_id"
+                    referenceTable="quote" referenceColumn="entity_id" onDelete="CASCADE"/>
+        <index referenceId="MAGEBIT_ABANDONED_CART_LOG_SENT_AT" indexType="btree">
+            <column name="sent_at"/>
+        </index>
+        <index referenceId="MAGEBIT_ABANDONED_CART_LOG_EMAIL_STORE" indexType="btree">
+            <column name="customer_email"/>
+            <column name="store_id"/>
+        </index>
+    </table>
+</schema>

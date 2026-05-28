@@ -1,0 +1,30 @@
+{
+    "magebit_abandoned_cart_log": {
+        "column": {
+            "id": true,
+            "quote_id": true,
+            "customer_email": true,
+            "store_id": true,
+            "email_type": true,
+            "stage_key": true,
+            "sent_at": true,
+            "status": true,
+            "provider_message_id": true,
+            "coupon_code": true,
+            "recovery_token": true,
+            "ai_generated": true,
+            "recovered_at": true,
+            "unsubscribed": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "MAGEBIT_ABANDONED_CART_LOG_QUOTE_STAGE_KEY": true,
+            "MAGEBIT_ABANDONED_CART_LOG_RECOVERY_TOKEN": true,
+            "MAGEBIT_ABANDONED_CART_LOG_QUOTE_ID_QUOTE_ENTITY_ID": true
+        },
+        "index": {
+            "MAGEBIT_ABANDONED_CART_LOG_SENT_AT": true,
+            "MAGEBIT_ABANDONED_CART_LOG_EMAIL_STORE": true
+        }
+    }
+}

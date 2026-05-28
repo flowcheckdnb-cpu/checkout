@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Email:etc/email_templates.xsd">
+    <template id="magebit_abandonedcart_stage_1"
+              label="Abandoned Cart - Stage 1 (Initial Reminder)"
+              file="stage_1.html"
+              type="html"
+              module="Magebit_AbandonedCart"
+              area="frontend"/>
+</config>

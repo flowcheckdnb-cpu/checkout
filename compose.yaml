@@ -1,0 +1,226 @@
+name: onsite-test
+
+services:
+  # ==========================================================================
+  # Traefik — HTTP-only reverse proxy on a static IP so /etc/hosts can map
+  # the project domain to a stable address regardless of which other Docker
+  # projects are running.
+  # ==========================================================================
+  traefik:
+    image: traefik:v3.7
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8090:8080"  # Traefik dashboard (http://localhost:8090)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./.docker/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ./.docker/traefik/ssl:/etc/traefik/ssl:ro
+    networks:
+      - onsite
+    restart: unless-stopped
+
+  # ==========================================================================
+  # App — Nginx + PHP-FPM + (optional) cron + (optional) sshd
+  # ==========================================================================
+  app:
+    build:
+      context: .docker/app
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+      - ./auth.json:/home/ubuntu/.composer/auth.json:ro
+    environment:
+      ENABLE_PHP_FPM: "true"
+      ENABLE_NGINX: "true"
+      ENABLE_CRON: "false"
+      ENABLE_SSHD: "false"
+      NGINX_SERVER_ROOT: "/app/pub"
+      NGINX_SERVER_NAME: "${DOMAIN}"
+      PHP_DISPLAY_ERRORS: "On"
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: "1"
+      PHP_OPCACHE_REVALIDATE_FREQ: "0"
+      MAGE_MODE: "developer"
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      valkey-cache:
+        condition: service_started
+      valkey-sessions:
+        condition: service_started
+      opensearch:
+        condition: service_started
+    networks:
+      - onsite
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Varnish — Magento full page cache. Traefik routes the storefront to here,
+  # Varnish then proxies to the app on :8080.
+  # ==========================================================================
+  varnish:
+    image: varnish:7.7.3-alpine
+    command: >
+      -p feature=+http2
+      -p vsl_reclen=4084
+      -p http_req_hdr_len=16k
+      -p http_resp_hdr_len=16k
+      -p http_resp_size=64k
+      -p workspace_client=1M
+      -p workspace_backend=1M
+    environment:
+      VARNISH_SIZE: "${VARNISH_SIZE:-256m}"
+    volumes:
+      - ./.docker/varnish/default.vcl:/etc/varnish/default.vcl:ro
+    healthcheck:
+      test: ["CMD", "varnishadm", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.onsite-test.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.onsite-test.entrypoints=websecure"
+      - "traefik.http.routers.onsite-test.tls=true"
+      - "traefik.http.services.onsite-test.loadbalancer.server.port=80"
+    depends_on:
+      - app
+    networks:
+      - onsite
+    restart: unless-stopped
+
+  # ==========================================================================
+  # MariaDB — Magento-tuned defaults
+  # ==========================================================================
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:-root}"
+      MYSQL_DATABASE: "${DB_NAME:-magento}"
+      MYSQL_USER: "${DB_USER:-magento}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-magento}"
+    command:
+      - --innodb_buffer_pool_size=512M
+      - --max_allowed_packet=64M
+      - --max_connections=50
+      - --innodb_flush_log_at_trx_commit=2
+      - --innodb_flush_method=O_DIRECT
+      - --innodb_file_per_table=1
+      - --transaction-isolation=READ-COMMITTED
+      - --optimizer_switch=rowid_filter=off
+      - --optimizer_use_condition_selectivity=1
+      - --tmp_table_size=32M
+      - --sort_buffer_size=4M
+      - --log_bin_trust_function_creators=1
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - onsite
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Valkey — Cache (LFU, no persistence)
+  # ==========================================================================
+  valkey-cache:
+    image: valkey/valkey:8.1.7-alpine
+    command:
+      - --maxmemory 256mb
+      - --maxmemory-policy allkeys-lfu
+      - --appendonly no
+      - --save ""
+    volumes:
+      - valkey_cache_data:/data
+    networks:
+      - onsite
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Valkey — Sessions (LRU, AOF persistence)
+  # ==========================================================================
+  valkey-sessions:
+    image: valkey/valkey:8.1.7-alpine
+    command:
+      - --maxmemory 256mb
+      - --maxmemory-policy allkeys-lru
+      - --appendonly yes
+      - --appendfsync everysec
+      - --save ""
+    volumes:
+      - valkey_session_data:/data
+    networks:
+      - onsite
+    restart: unless-stopped
+
+  # ==========================================================================
+  # OpenSearch (with analysis-phonetic + analysis-icu plugins)
+  # ==========================================================================
+  opensearch:
+    build:
+      context: .docker/opensearch
+      dockerfile: Dockerfile
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - cluster.routing.allocation.disk.threshold_enabled=false
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    networks:
+      - onsite
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Mailpit — catch-all for outbound mail (UI on http://mail.${DOMAIN})
+  # ==========================================================================
+  mailpit:
+    image: axllent/mailpit:latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.onsite-test-mail.rule=Host(`mail.${DOMAIN}`)"
+      - "traefik.http.routers.onsite-test-mail.entrypoints=websecure"
+      - "traefik.http.routers.onsite-test-mail.tls=true"
+      - "traefik.http.services.onsite-test-mail.loadbalancer.server.port=8025"
+    networks:
+      - onsite
+    restart: unless-stopped
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  mariadb_data:
+  valkey_cache_data:
+  valkey_session_data:
+  opensearch_data:
+
+networks:
+  onsite:
+    driver: bridge

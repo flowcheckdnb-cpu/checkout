@@ -1,0 +1,13 @@
+# Keep the .docker/app build context tiny — Dockerfile builds from there only.
+.git
+.github
+.idea
+.vscode
+node_modules
+generated
+var
+pub/static
+pub/media
+*.log
+*.sql
+*.sql.gz

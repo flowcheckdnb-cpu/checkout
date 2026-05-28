@@ -1,0 +1,53 @@
+# PHPStan config — max strict for this onboarding sandbox.
+#
+# Why level 9 + strict rules + deprecation rules:
+#   - Codebase is greenfield. Easier to keep strict than tighten later.
+#   - bitexpert/phpstan-magento covers Magento's DataObject magic methods
+#     (get/set/has/uns via __call) and factory return types — handles ~80%
+#     of "Call to an undefined method" noise automatically.
+#
+# When you DO need to add an entry to ignoreErrors:
+#   - Use a `path:` (file or glob) — never message-only.
+#   - Add a `# why:` comment above each entry explaining the cause.
+#   - If you can't justify it in 2 sentences, fix the code instead. Most
+#     "undefined method" cases on your own DataObject subclasses are
+#     solved by adding @method PHPDoc to the class.
+#
+# Run from inside the app container:  composer stan
+# Or via dev wrapper:                  ./dev.sh stan
+
+# Note: bitexpert/phpstan-magento, phpstan-strict-rules,
+# phpstan-deprecation-rules, and tomasvotruba/cognitive-complexity are
+# auto-loaded by phpstan/extension-installer. No manual `includes:` needed.
+
+parameters:
+    level: 9
+    paths:
+        - app/code
+
+    # Magento generates factories, proxies, and interceptors here.
+    # Scanning lets PHPStan resolve types when our code calls them.
+    scanDirectories:
+        - generated/code
+
+    # Magento's @return PHPDocs lie often (legacy code returns mixed).
+    # Don't trust them blindly — verify against the actual implementation.
+    treatPhpDocTypesAsCertain: false
+
+    # Force ignoreErrors hygiene: dead patterns become hard errors.
+    reportUnmatchedIgnoredErrors: true
+
+    # Cognitive complexity (tomasvotruba/cognitive-complexity).
+    # Catches deeply-nested logic that's hard to follow but slips under
+    # cyclomatic counts. Thresholds are tuned for Magento patterns:
+    #   - class: 80  (default 50 is too tight for DI-heavy classes)
+    #   - function: 15  (matches our PHPCS Generic.Metrics.CyclomaticComplexity)
+    # Start tight-but-realistic; lower once the codebase has enough real
+    # code to calibrate against.
+    cognitive_complexity:
+        class: 80
+        function: 15
+
+    # Empty by design. Add narrow ignores ONLY with `path:` + `# why:` comment.
+    # See header for policy.
+    ignoreErrors: []

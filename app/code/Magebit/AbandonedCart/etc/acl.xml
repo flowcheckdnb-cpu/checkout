@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
+    <acl>
+        <resources>
+            <resource id="Magento_Backend::admin">
+                <resource id="Magento_Backend::marketing">
+                    <resource id="Magebit_AbandonedCart::log" title="Abandoned Cart Log" sortOrder="50">
+                        <resource id="Magebit_AbandonedCart::log_resend" title="Resend Abandoned Cart Email"/>
+                        <resource id="Magebit_AbandonedCart::log_test_send" title="Send Test Email"/>
+                    </resource>
+                </resource>
+                <resource id="Magento_Backend::stores">
+                    <resource id="Magento_Backend::stores_settings">
+                        <resource id="Magento_Config::config">
+                            <resource id="Magebit_AbandonedCart::config" title="Magebit AbandonedCart Config"/>
+                        </resource>
+                    </resource>
+                </resource>
+            </resource>
+        </resources>
+    </acl>
+</config>

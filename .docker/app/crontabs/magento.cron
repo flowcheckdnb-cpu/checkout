@@ -1,0 +1,1 @@
+* * * * * cd /app && php bin/magento cron:run 2>&1 | tee -a /var/log/supervisor/magento-cron.log

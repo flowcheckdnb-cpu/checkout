@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<ruleset name="OnsiteTest" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <description>
+        Coding standard for the onsite-test sandbox.
+        Layered strictness:
+          - Magento2 ruleset (~150 sniffs, official Magento conventions)
+          - PSR-12 (filling gaps where Magento2 is silent)
+          - Slevomat (modern PHP type-hint enforcement)
+
+        Run from inside the app container:
+          composer sniff       # report violations
+          composer fix         # auto-fix what can be fixed
+        Or via dev wrapper:
+          ./dev.sh sniff
+          ./dev.sh fix
+    </description>
+
+    <!-- Scope: only our own code, not Magento/Hyvä vendor -->
+    <file>app/code</file>
+    <file>app/design/frontend</file>
+
+    <!-- File extensions -->
+    <arg name="extensions" value="php,phtml"/>
+
+    <!-- Show source rule names so juniors can look them up -->
+    <arg name="report" value="full"/>
+    <arg value="ps"/>
+    <arg name="colors"/>
+
+    <!-- ===================================================================
+         Layer 1: Magento's official ruleset
+         Provides: PSR-2 base, Magento naming conventions, PHPDoc requirements,
+         forbidden patterns (eval, var_dump, ObjectManager direct usage).
+         =================================================================== -->
+    <rule ref="Magento2"/>
+
+    <!-- ===================================================================
+         Layer 2: PSR-12 fills the gaps Magento2 doesn't cover
+         Magento2 is PSR-2 based; PSR-12 adds modern requirements
+         (declare(strict_types=1), constant visibility, etc.)
+         =================================================================== -->
+    <rule ref="PSR12"/>
+
+    <!-- ===================================================================
+         Layer 3: Slevomat — strict type hints, modern PHP
+         Picks specific high-value sniffs. Don't include the whole ruleset
+         (too opinionated, conflicts with Magento conventions).
+         =================================================================== -->
+    <rule ref="SlevomatCodingStandard.TypeHints.DeclareStrictTypes">
+        <properties>
+            <property name="declareOnFirstLine" value="false"/>
+            <property name="linesCountBeforeDeclare" value="1"/>
+            <!-- PSR-12 wants `strict_types=1` (no spaces). Defer to PSR-12. -->
+            <property name="spacesCountAroundEqualsSign" value="0"/>
+        </properties>
+    </rule>
+    <rule ref="SlevomatCodingStandard.TypeHints.NullableTypeForNullDefaultValue"/>
+    <rule ref="SlevomatCodingStandard.Functions.UnusedParameter"/>
+    <rule ref="SlevomatCodingStandard.Functions.UselessParameterDefaultValue"/>
+    <rule ref="SlevomatCodingStandard.Variables.UnusedVariable"/>
+    <rule ref="SlevomatCodingStandard.PHP.UselessParentheses"/>
+    <rule ref="SlevomatCodingStandard.Operators.NegationOperatorSpacing"/>
+
+    <!-- ===================================================================
+         Exclusions that are unavoidable for Magento patterns
+         ===================================================================
+         Magento's __construct DI argument lists routinely have 8+ params.
+         The "max args" sniff fires constantly with no useful signal.
+         =================================================================== -->
+    <rule ref="Generic.Metrics.CyclomaticComplexity">
+        <properties>
+            <property name="complexity" value="15"/>
+            <property name="absoluteComplexity" value="25"/>
+        </properties>
+    </rule>
+</ruleset>

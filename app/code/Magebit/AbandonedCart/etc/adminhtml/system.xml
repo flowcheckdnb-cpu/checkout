@@ -1,0 +1,176 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <tab id="magebit" translate="label" sortOrder="500">
+            <label>Magebit</label>
+        </tab>
+        <section id="magebit_abandonedcart" translate="label" sortOrder="10"
+                 showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>Abandoned Cart</label>
+            <tab>magebit</tab>
+            <resource>Magebit_AbandonedCart::config</resource>
+
+            <group id="general" translate="label" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>General</label>
+                <field id="enabled" translate="label" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Enable Module</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="sender_email" translate="label" type="select" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Sender Identity</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Identity</source_model>
+                </field>
+                <field id="unsubscribe_route" translate="label comment" type="text" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Unsubscribe Route</label>
+                    <comment>Frontend path for one-click unsubscribe.</comment>
+                </field>
+            </group>
+
+            <group id="stages" translate="label" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Abandoned Cart Stages</label>
+
+                <group id="stage_1" translate="label" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Stage 1 (Initial Reminder)</label>
+                    <field id="delay_minutes" translate="label" type="text" sortOrder="10"
+                           showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Delay (minutes)</label>
+                        <validate>validate-digits validate-greater-than-zero</validate>
+                    </field>
+                    <field id="template" translate="label" type="select" sortOrder="20"
+                           showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Email Template</label>
+                        <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    </field>
+                </group>
+
+                <group id="stage_2" translate="label" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Stage 2 (Follow-up)</label>
+                    <field id="delay_minutes" translate="label" type="text" sortOrder="10"
+                           showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Delay (minutes)</label>
+                        <validate>validate-digits validate-greater-than-zero</validate>
+                    </field>
+                    <field id="template" translate="label" type="select" sortOrder="20"
+                           showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Email Template</label>
+                        <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    </field>
+                </group>
+
+                <group id="stage_3" translate="label" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Stage 3 (Final + Coupon)</label>
+                    <field id="delay_minutes" translate="label" type="text" sortOrder="10"
+                           showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Delay (minutes)</label>
+                        <validate>validate-digits validate-greater-than-zero</validate>
+                    </field>
+                    <field id="template" translate="label" type="select" sortOrder="20"
+                           showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Email Template</label>
+                        <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    </field>
+                    <field id="coupon_rule_id" translate="label comment" type="select" sortOrder="30"
+                           showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Coupon Cart Price Rule</label>
+                        <comment>Selected rule must have "Use Auto Generation" enabled.</comment>
+                        <source_model>Magebit\AbandonedCart\Model\Source\CartPriceRule</source_model>
+                    </field>
+                    <field id="coupon_ttl_hours" translate="label" type="text" sortOrder="40"
+                           showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Coupon TTL (hours)</label>
+                        <validate>validate-digits validate-greater-than-zero</validate>
+                    </field>
+                </group>
+            </group>
+
+            <group id="low_stock" translate="label" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Low-Stock Urgency Email</label>
+                <field id="enabled" translate="label" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Low-Stock Emails</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="threshold_qty" translate="label comment" type="text" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Low-Stock Threshold (qty)</label>
+                    <comment>Trigger when any cart item has qty ≤ this value.</comment>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                </field>
+                <field id="template" translate="label" type="select" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Template</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                </field>
+                <field id="coupon_rule_id" translate="label" type="select" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Coupon Cart Price Rule</label>
+                    <source_model>Magebit\AbandonedCart\Model\Source\CartPriceRule</source_model>
+                </field>
+                <field id="coupon_ttl_hours" translate="label" type="text" sortOrder="50"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Coupon TTL (hours)</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                </field>
+                <field id="frequency_cap_hours" translate="label comment" type="text" sortOrder="60"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Frequency Cap (hours)</label>
+                    <comment>Minimum gap between low-stock emails to the same cart.</comment>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                </field>
+            </group>
+
+            <group id="brand_voice" translate="label" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Brand Voice (AI Personalization)</label>
+                <field id="brand_name" translate="label" type="text" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Brand Name</label>
+                </field>
+                <field id="voice_description" translate="label comment" type="textarea" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Voice Description</label>
+                    <comment>Describe the brand's tone in 2–3 sentences. Fed to the AI as a system prompt.</comment>
+                </field>
+                <field id="tone" translate="label" type="select" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Tone</label>
+                    <source_model>Magebit\AbandonedCart\Model\Source\Tone</source_model>
+                </field>
+                <field id="locale" translate="label" type="select" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Locale</label>
+                    <source_model>Magento\Config\Model\Config\Source\Locale</source_model>
+                </field>
+            </group>
+
+            <group id="gemini_api" translate="label" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Gemini API (Google AI Studio)</label>
+                <field id="enable_ai" translate="label comment" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable AI Copy Generation</label>
+                    <comment>If disabled (or on API failure) the static template fallback is used.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="api_key" translate="label comment" type="obscure" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>API Key</label>
+                    <comment>Free key at https://aistudio.google.com.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                </field>
+                <field id="model" translate="label" type="select" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Model</label>
+                    <source_model>Magebit\AbandonedCart\Model\Source\GeminiModel</source_model>
+                </field>
+                <field id="request_timeout_seconds" translate="label" type="text" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Request Timeout (seconds)</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>
