@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Magebit\AbandonedCart\Model\Email;
 
 use Magebit\AbandonedCart\Model\Config;
+use Magebit\AbandonedCart\Service\Coupon\CouponIssuer;
 use Magebit\AbandonedCart\Service\Coupon\GeneratedCoupon;
 use Magento\Backend\Model\UrlInterface as BackendUrl;
 use Magento\Catalog\Api\ProductRepositoryInterface;
@@ -50,6 +51,7 @@ class TestEmailService
      * @param BackendUrl $backendUrl
      * @param CustomerRepositoryInterface $customerRepository
      * @param CartRepositoryInterface $cartRepository
+     * @param CouponIssuer $couponIssuer
      */
     public function __construct(
         private readonly Config $config,
@@ -61,6 +63,7 @@ class TestEmailService
         private readonly BackendUrl $backendUrl,
         private readonly CustomerRepositoryInterface $customerRepository,
         private readonly CartRepositoryInterface $cartRepository,
+        private readonly CouponIssuer $couponIssuer,
     ) {
     }
 
@@ -113,7 +116,7 @@ class TestEmailService
             $subtotal = $items[0]->rowTotal;
         }
 
-        $coupon = $this->sampleCoupon($emailType, $recipientFirstName);
+        $coupon = $this->sampleCoupon($emailType, $storeId, $recipientFirstName);
 
         $generated = $this->generator->generate(
             $emailType,
@@ -239,17 +242,37 @@ class TestEmailService
     }
 
     /**
-     * Mint a synthetic non-persisted coupon for stage_3 / low_stock previews, prefixed with first name.
+     * Mint a real (persisted) coupon via CouponIssuer for stage_3 / low_stock previews.
+     *
+     * Falls back to a synthetic local-only code if no rule is configured for the
+     * given stage or if minting fails, so the email still renders. Note that a
+     * synthetic code will not validate at checkout.
      *
      * @param string $emailType
+     * @param int $storeId
      * @param string $recipientFirstName
      * @return GeneratedCoupon|null
      */
-    private function sampleCoupon(string $emailType, string $recipientFirstName): ?GeneratedCoupon
-    {
+    private function sampleCoupon(
+        string $emailType,
+        int $storeId,
+        string $recipientFirstName,
+    ): ?GeneratedCoupon {
         if ($emailType !== 'stage_3' && $emailType !== 'low_stock') {
             return null;
         }
+        [$ruleId, $ttlHours] = $emailType === 'stage_3'
+            ? [$this->config->getStage3CouponRuleId($storeId), $this->config->getStage3CouponTtlHours($storeId)]
+            : [$this->config->getLowStockCouponRuleId($storeId), $this->config->getLowStockCouponTtlHours($storeId)];
+
+        if ($ruleId !== 0) {
+            try {
+                return $this->couponIssuer->issue($ruleId, $ttlHours, $recipientFirstName);
+            } catch (Throwable $mintFailed) {
+                unset($mintFailed);
+            }
+        }
+
         $cleaned = preg_replace('/[^A-Z]/', '', strtoupper($recipientFirstName));
         $prefix = is_string($cleaned) && $cleaned !== '' ? substr($cleaned, 0, 10) : 'DEMO';
         $suffix = strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
