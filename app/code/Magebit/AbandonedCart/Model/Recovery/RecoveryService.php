@@ -85,16 +85,16 @@ class RecoveryService
         $quote->setIsActive(true);
         $this->cartRepository->save($quote);
 
+        // replaceQuote() sets BOTH the session's quote_id AND the in-memory
+        // $_quote. Do NOT call CheckoutSession::clearStorage() before this —
+        // that calls $_SESSION = [] under the hood, wiping any customer
+        // session login state we set below.
+        $this->checkoutSession->replaceQuote($quote);
+
         // If the quote belongs to a registered customer, log them in — Magento
         // hides customer-owned carts from guest visitors, so without this the
         // cart page renders empty on the redirect.
         $this->loginOwnerIfRegistered($quote);
-
-        // replaceQuote() sets BOTH the session's quote_id AND the in-memory
-        // checkout-session $_quote. Plain setQuoteId() leaves the in-memory
-        // state stale and the cart page renders empty on the redirect.
-        $this->checkoutSession->clearStorage();
-        $this->checkoutSession->replaceQuote($quote);
 
         return $quoteId;
     }
