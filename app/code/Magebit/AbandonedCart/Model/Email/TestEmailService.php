@@ -9,6 +9,7 @@ use Magebit\AbandonedCart\Service\Coupon\GeneratedCoupon;
 use Magento\Backend\Model\UrlInterface as BackendUrl;
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Model\Product;
+use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Notification\NotifierInterface;
@@ -34,7 +35,7 @@ class TestEmailService
     private const FALLBACK_PRODUCT_NAME = 'Iris Workout Top (sample)';
     private const FALLBACK_PRICE = 49.99;
     private const SAMPLE_CURRENCY = 'USD';
-    private const SAMPLE_FIRST_NAME = 'Demo';
+    private const FALLBACK_FIRST_NAME = 'there';
     private const COUPON_TTL_HOURS = 168;
 
     /**
@@ -45,6 +46,7 @@ class TestEmailService
      * @param ProductRepositoryInterface $productRepository
      * @param NotifierInterface $notifier
      * @param BackendUrl $backendUrl
+     * @param CustomerRepositoryInterface $customerRepository
      */
     public function __construct(
         private readonly Config $config,
@@ -54,6 +56,7 @@ class TestEmailService
         private readonly ProductRepositoryInterface $productRepository,
         private readonly NotifierInterface $notifier,
         private readonly BackendUrl $backendUrl,
+        private readonly CustomerRepositoryInterface $customerRepository,
     ) {
     }
 
@@ -95,13 +98,14 @@ class TestEmailService
 
         $items = [$this->buildSampleItem($store, $storeId)];
         $subtotal = $items[0]->rowTotal;
+        $recipientFirstName = $this->resolveFirstName($recipientEmail, $store);
 
-        $coupon = $this->sampleCoupon($emailType);
+        $coupon = $this->sampleCoupon($emailType, $recipientFirstName);
 
         $generated = $this->generator->generate(
             $emailType,
             $storeId,
-            self::SAMPLE_FIRST_NAME,
+            $recipientFirstName,
             (string) $store->getName(),
             $items,
             $subtotal,
@@ -121,7 +125,7 @@ class TestEmailService
         $this->dispatcher->send(
             $storeId,
             $recipientEmail,
-            self::SAMPLE_FIRST_NAME,
+            $recipientFirstName,
             $template,
             $generated,
             $items,
@@ -217,21 +221,49 @@ class TestEmailService
     }
 
     /**
-     * Mint a synthetic (non-persisted) coupon for stage_3 / low_stock previews.
+     * Mint a synthetic non-persisted coupon for stage_3 / low_stock previews, prefixed with first name.
      *
      * @param string $emailType
+     * @param string $recipientFirstName
      * @return GeneratedCoupon|null
      */
-    private function sampleCoupon(string $emailType): ?GeneratedCoupon
+    private function sampleCoupon(string $emailType, string $recipientFirstName): ?GeneratedCoupon
     {
         if ($emailType !== 'stage_3' && $emailType !== 'low_stock') {
             return null;
         }
+        $cleaned = preg_replace('/[^A-Z]/', '', strtoupper($recipientFirstName));
+        $prefix = is_string($cleaned) && $cleaned !== '' ? substr($cleaned, 0, 10) : 'DEMO';
         $suffix = strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
         return new GeneratedCoupon(
-            code: 'DEMO-' . $suffix,
+            code: $prefix . '-' . $suffix,
             expiresAtUnix: time() + self::COUPON_TTL_HOURS * 3600,
         );
+    }
+
+    /**
+     * Resolve the recipient's first name via customer lookup, falling back to a polite generic.
+     *
+     * @param string $recipientEmail
+     * @param Store $store
+     * @return string
+     */
+    private function resolveFirstName(string $recipientEmail, Store $store): string
+    {
+        $websiteIdRaw = $store->getWebsiteId();
+        if (!is_scalar($websiteIdRaw)) {
+            return self::FALLBACK_FIRST_NAME;
+        }
+        try {
+            $customer = $this->customerRepository->get($recipientEmail, (int) $websiteIdRaw);
+        } catch (Throwable) {
+            return self::FALLBACK_FIRST_NAME;
+        }
+        $firstNameRaw = $customer->getFirstname();
+        if (!is_string($firstNameRaw) || $firstNameRaw === '') {
+            return self::FALLBACK_FIRST_NAME;
+        }
+        return $firstNameRaw;
     }
 
     /**

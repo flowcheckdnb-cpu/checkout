@@ -8,7 +8,9 @@ declare(strict_types=1);
 $saveUrl = $block->getUrl('magebit_abandonedcart/sendlog/testsendsave');
 $listingUrl = $block->getUrl('magebit_abandonedcart/sendlog/index');
 $defaultEmailRaw = $block->getData('default_email');
-$defaultEmail = is_string($defaultEmailRaw) ? $defaultEmailRaw : '';
+$defaultEmail = is_string($defaultEmailRaw) && $defaultEmailRaw !== ''
+    ? $defaultEmailRaw
+    : 'roni_cost@example.com';
 
 $esc = static function (string $text) use ($escaper): string {
     $out = $escaper->escapeHtml($text);
