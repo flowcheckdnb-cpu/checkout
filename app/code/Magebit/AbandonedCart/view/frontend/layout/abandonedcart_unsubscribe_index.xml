@@ -20,7 +20,7 @@
         <referenceContainer name="breadcrumbs" remove="true"/>
 
         <referenceContainer name="content">
-            <block class="Magento\Framework\View\Element\Template"
+            <block class="Magebit\AbandonedCart\Block\Frontend\UnsubscribeConfirm"
                    name="magebit.abandonedcart.unsubscribe.confirm"
                    template="Magebit_AbandonedCart::unsubscribe/confirm.phtml"/>
         </referenceContainer>

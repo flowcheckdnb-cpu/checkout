@@ -25,6 +25,14 @@ parameters:
     paths:
         - app/code
 
+    # Tests are excluded — PHPUnit's static assertion methods (assertSame,
+    # assertTrue, …) get called dynamically on TestCase subclasses, which
+    # PHPStan otherwise flags as `staticMethod.dynamicCall` noise. Run them
+    # with `vendor/bin/phpunit` for correctness; production code stays at
+    # level 9.
+    excludePaths:
+        - app/code/*/*/Test/*
+
     # Magento generates factories, proxies, and interceptors here.
     # Scanning lets PHPStan resolve types when our code calls them.
     scanDirectories:

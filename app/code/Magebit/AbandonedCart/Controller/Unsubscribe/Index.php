@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Magebit\AbandonedCart\Controller\Unsubscribe;
 
+use Magebit\AbandonedCart\Block\Frontend\UnsubscribeConfirm;
 use Magebit\AbandonedCart\Model\Unsubscribe\UnsubscribeService;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\ActionInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\Controller\ResultInterface;
-use Magento\Framework\Registry;
+use Magento\Framework\View\Result\Page;
 use Magento\Framework\View\Result\PageFactory;
 
 /**
@@ -29,14 +30,12 @@ class Index implements HttpGetActionInterface, ActionInterface
      * @param RequestInterface $request
      * @param ResultFactory $resultFactory
      * @param PageFactory $pageFactory
-     * @param Registry $registry
      * @param UnsubscribeService $unsubscribeService
      */
     public function __construct(
         private readonly RequestInterface $request,
         private readonly ResultFactory $resultFactory,
         private readonly PageFactory $pageFactory,
-        private readonly Registry $registry,
         private readonly UnsubscribeService $unsubscribeService,
     ) {
     }
@@ -59,7 +58,12 @@ class Index implements HttpGetActionInterface, ActionInterface
             return $redirect;
         }
 
-        $this->registry->register('magebit_abandonedcart_unsubscribed_email', $email);
-        return $this->pageFactory->create();
+        $page = $this->pageFactory->create();
+        /** @var Page $page */
+        $block = $page->getLayout()->getBlock(UnsubscribeConfirm::BLOCK_NAME);
+        if ($block instanceof UnsubscribeConfirm) {
+            $block->setData(UnsubscribeConfirm::DATA_KEY_EMAIL, $email);
+        }
+        return $page;
     }
 }

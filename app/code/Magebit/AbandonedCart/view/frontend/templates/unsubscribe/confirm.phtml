@@ -2,27 +2,39 @@
 
 declare(strict_types=1);
 
-/** @var \Magento\Framework\View\Element\Template $block */
+/** @var \Magebit\AbandonedCart\Block\Frontend\UnsubscribeConfirm $block */
 /** @var \Magento\Framework\Escaper $escaper */
 
-$registry = $block->getData('registry');
-if (!$registry instanceof \Magento\Framework\Registry) {
-    $registry = \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Framework\Registry::class);
-}
-$emailRaw = $registry->registry('magebit_abandonedcart_unsubscribed_email');
-$email = is_string($emailRaw) ? $emailRaw : '';
+$email = $block->getUnsubscribedEmail();
+
+$esc = static function (string $text) use ($escaper): string {
+    $out = $escaper->escapeHtml($text);
+    return is_string($out) ? $out : '';
+};
+
+$escWithStrong = static function (string $text) use ($escaper): string {
+    $out = $escaper->escapeHtml($text, ['strong']);
+    return is_string($out) ? $out : '';
+};
+
+$wrapperStyle = 'max-width:560px;margin:80px auto;padding:32px;text-align:center;'
+    . "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif";
+
+$labels = [
+    'title' => $esc((string) __("You're unsubscribed")),
+    'stopped_for_email' => $email !== ''
+        ? $escWithStrong((string) __('We have stopped sending recovery emails to <strong>%1</strong>.', $email))
+        : $esc((string) __('We have stopped sending recovery emails to this address.')),
+    'footer' => $esc((string) __('Changed your mind? Contact us and we will re-enable them.')),
+];
 ?>
 
-<div style="max-width: 560px; margin: 80px auto; padding: 32px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
-    <h1 style="font-size: 24px; margin: 0 0 16px;"><?= $escaper->escapeHtml(__("You're unsubscribed")) ?></h1>
-    <p style="font-size: 16px; color: #4b5563; margin: 0 0 8px;">
-        <?php if ($email !== ''): ?>
-            <?= $escaper->escapeHtml(__('We have stopped sending recovery emails to <strong>%1</strong>.', $email), ['strong']) ?>
-        <?php else: ?>
-            <?= $escaper->escapeHtml(__('We have stopped sending recovery emails to this address.')) ?>
-        <?php endif; ?>
+<div style="<?= /* @noEscape */ $wrapperStyle ?>">
+    <h1 style="font-size:24px;margin:0 0 16px"><?= /* @noEscape */ $labels['title'] ?></h1>
+    <p style="font-size:16px;color:#4b5563;margin:0 0 8px">
+        <?= /* @noEscape */ $labels['stopped_for_email'] ?>
     </p>
-    <p style="font-size: 14px; color: #6b7280; margin: 24px 0 0;">
-        <?= $escaper->escapeHtml(__('Changed your mind? Contact us and we will re-enable them.')) ?>
+    <p style="font-size:14px;color:#6b7280;margin:24px 0 0">
+        <?= /* @noEscape */ $labels['footer'] ?>
     </p>
 </div>
