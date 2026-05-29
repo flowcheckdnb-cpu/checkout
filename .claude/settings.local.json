@@ -30,7 +30,9 @@
       "Bash(curl -sI -k \"https://onsite-test.docker/admin/dashboard/\")",
       "Bash(curl -sI -k \"https://onsite-test.docker/admin/magebit_abandonedcart/sendlog/testsend\")",
       "Bash(python3 -c \"import sys, json; print\\(f'  {json.load\\(sys.stdin\\)[\\\\\"total\\\\\"]} messages'\\)\")",
-      "Bash(/home/bootcamp/projects/test/dev.sh shell *)"
+      "Bash(/home/bootcamp/projects/test/dev.sh shell *)",
+      "Bash(curl -s \"https://packagist.org/packages/flowcheckdnb-cpu/module-abandoned-cart.json\")",
+      "Bash(curl -s -X POST \"https://packagist.org/api/update-package?username=flowcheckdnb-cpu&apiToken=654d385bb7017b43b7b60e0240f7a8570da07c5e\" -d '{\"repository\":{\"url\":\"https://github.com/flowcheckdnb-cpu/magento2-abandoned-cart\"}}' -H \"Content-Type: application/json\")"
     ]
   }
 }

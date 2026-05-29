@@ -94,7 +94,7 @@ class SendLogRepository
         $table = $this->resourceConnection->getTableName('magebit_abandoned_cart_log');
         $connection->update(
             $table,
-            ['recovered_at' => $connection->fromUnixtime(time())],
+            ['recovered_at' => date('Y-m-d H:i:s')],
             ['quote_id = ?' => $quoteId, 'recovered_at IS NULL'],
         );
     }
@@ -110,7 +110,6 @@ class SendLogRepository
         $collection = $this->collectionFactory->create();
         $collection->addFieldToFilter('recovery_token', ['eq' => $token]);
         $collection->setPageSize(1);
-        /** @var SendLog|false $row */
         $row = $collection->getFirstItem();
         if (!$row instanceof SendLog || $row->getId() === null) {
             return null;

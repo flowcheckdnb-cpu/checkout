@@ -6,6 +6,7 @@ namespace Magebit\AbandonedCart\Test\Integration\Model\Log;
 
 use Magebit\AbandonedCart\Model\Log\SendLog;
 use Magebit\AbandonedCart\Model\Log\SendLogRepository;
+use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Exception\AlreadyExistsException;
 use Magento\TestFramework\Helper\Bootstrap;
 use PHPUnit\Framework\TestCase;
@@ -42,6 +43,14 @@ class SendLogRepositoryTest extends TestCase
         $repo = $om->get(SendLogRepository::class);
         self::assertInstanceOf(SendLogRepository::class, $repo);
         $this->repository = $repo;
+
+        // The log table has a FK to quote.entity_id (good for production
+        // cascade-on-delete). These tests assert dedup / recovery / unsubscribe
+        // semantics, not the FK — disable checks so we can use synthetic
+        // quote_ids without seeding unrelated fixture data.
+        $resource = $om->get(ResourceConnection::class);
+        self::assertInstanceOf(ResourceConnection::class, $resource);
+        $resource->getConnection()->query('SET FOREIGN_KEY_CHECKS=0');
     }
 
     /**
