@@ -55,10 +55,10 @@ class CartItemsRenderer
      */
     private function row(CartItemSummary $item, string $currency): string
     {
-        $nameEsc = (string) $this->escaper->escapeHtml($item->name);
+        $nameEsc = $this->escString($item->name);
         $qty = $this->formatQty($item->qty);
         $price = $currency . ' ' . number_format($item->rowTotal, 2, '.', '');
-        $priceEsc = (string) $this->escaper->escapeHtml($price);
+        $priceEsc = $this->escString($price);
         $hasUrl = $item->productUrl !== '';
         $urlEsc = $hasUrl ? $this->escaper->escapeUrl($item->productUrl) : '';
 
@@ -80,8 +80,7 @@ class CartItemsRenderer
     }
 
     /**
-     * Build the thumbnail cell — image with fixed dimensions so the layout
-     * survives even when the client blocks images.
+     * Build the thumbnail cell with fixed dimensions so the layout survives image-blocking clients.
      *
      * @param CartItemSummary $item
      * @param string $altEsc Pre-escaped product name.
@@ -114,5 +113,20 @@ class CartItemsRenderer
     {
         $formatted = number_format($qty, 2, '.', '');
         return rtrim(rtrim($formatted, '0'), '.');
+    }
+
+    /**
+     * HTML-escape a string, normalizing escapeHtml's string|array return to a plain string.
+     *
+     * @param string $raw
+     * @return string
+     */
+    private function escString(string $raw): string
+    {
+        $escaped = $this->escaper->escapeHtml($raw);
+        if (is_array($escaped)) {
+            return implode('', array_map('strval', $escaped));
+        }
+        return $escaped;
     }
 }
