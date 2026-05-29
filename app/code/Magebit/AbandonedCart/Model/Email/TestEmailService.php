@@ -15,6 +15,8 @@ use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Notification\NotifierInterface;
 use Magento\Framework\Phrase;
 use Magento\Framework\UrlInterface;
+use Magento\Quote\Api\CartRepositoryInterface;
+use Magento\Quote\Model\Quote;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Throwable;
@@ -47,6 +49,7 @@ class TestEmailService
      * @param NotifierInterface $notifier
      * @param BackendUrl $backendUrl
      * @param CustomerRepositoryInterface $customerRepository
+     * @param CartRepositoryInterface $cartRepository
      */
     public function __construct(
         private readonly Config $config,
@@ -57,6 +60,7 @@ class TestEmailService
         private readonly NotifierInterface $notifier,
         private readonly BackendUrl $backendUrl,
         private readonly CustomerRepositoryInterface $customerRepository,
+        private readonly CartRepositoryInterface $cartRepository,
     ) {
     }
 
@@ -96,9 +100,18 @@ class TestEmailService
             );
         }
 
-        $items = [$this->buildSampleItem($store, $storeId)];
-        $subtotal = $items[0]->rowTotal;
         $recipientFirstName = $this->resolveFirstName($recipientEmail, $store);
+        $realCartItems = $this->loadRealCartItems($recipientEmail, $store);
+        if ($realCartItems !== []) {
+            $items = $realCartItems;
+            $subtotal = 0.0;
+            foreach ($items as $row) {
+                $subtotal += $row->rowTotal;
+            }
+        } else {
+            $items = [$this->buildSampleItem($store, $storeId)];
+            $subtotal = $items[0]->rowTotal;
+        }
 
         $coupon = $this->sampleCoupon($emailType, $recipientFirstName);
 
@@ -243,6 +256,87 @@ class TestEmailService
         return new GeneratedCoupon(
             code: $prefix . '-' . $suffix,
             expiresAtUnix: time() + self::COUPON_TTL_HOURS * 3600,
+        );
+    }
+
+    /**
+     * Look up the recipient's active cart and return its items as DTOs, or [] if none.
+     *
+     * @param string $recipientEmail
+     * @param Store $store
+     * @return CartItemSummary[]
+     */
+    private function loadRealCartItems(string $recipientEmail, Store $store): array
+    {
+        $quote = $this->loadActiveQuoteFor($recipientEmail, $store);
+        if ($quote === null) {
+            return [];
+        }
+        $mediaBase = $store->getBaseUrl(UrlInterface::URL_TYPE_MEDIA);
+        $rows = [];
+        foreach ($quote->getAllVisibleItems() as $item) {
+            $rows[] = $this->quoteItemToSummary($item, $mediaBase);
+        }
+        return $rows;
+    }
+
+    /**
+     * Resolve the recipient's active customer quote, or null if not found.
+     *
+     * @param string $recipientEmail
+     * @param Store $store
+     * @return Quote|null
+     */
+    private function loadActiveQuoteFor(string $recipientEmail, Store $store): ?Quote
+    {
+        $websiteIdRaw = $store->getWebsiteId();
+        if (!is_scalar($websiteIdRaw)) {
+            return null;
+        }
+        try {
+            $customer = $this->customerRepository->get($recipientEmail, (int) $websiteIdRaw);
+            $customerIdRaw = $customer->getId();
+            if (!is_scalar($customerIdRaw)) {
+                return null;
+            }
+            $quote = $this->cartRepository->getActiveForCustomer((int) $customerIdRaw);
+        } catch (Throwable) {
+            return null;
+        }
+        return $quote instanceof Quote ? $quote : null;
+    }
+
+    /**
+     * Convert one quote item into a CartItemSummary, resolving image + URL from its product.
+     *
+     * @param \Magento\Quote\Model\Quote\Item $item
+     * @param string $mediaBase
+     * @return CartItemSummary
+     */
+    private function quoteItemToSummary(\Magento\Quote\Model\Quote\Item $item, string $mediaBase): CartItemSummary
+    {
+        $nameRaw = $item->getName();
+        $qtyRaw = $item->getQty();
+        $rowRaw = $item->getRowTotal();
+        $imageUrl = '';
+        $productUrl = '';
+        $product = $item->getProduct();
+        if ($product !== null) {
+            $thumbRaw = $product->getData('thumbnail');
+            if (is_string($thumbRaw) && $thumbRaw !== '' && $thumbRaw !== 'no_selection') {
+                $imageUrl = rtrim($mediaBase, '/') . '/catalog/product/' . ltrim($thumbRaw, '/');
+            }
+            $urlRaw = $product->getProductUrl();
+            if (is_string($urlRaw)) {
+                $productUrl = $urlRaw;
+            }
+        }
+        return new CartItemSummary(
+            name: is_string($nameRaw) ? $nameRaw : '',
+            qty: is_numeric($qtyRaw) ? (float) $qtyRaw : 0.0,
+            rowTotal: is_numeric($rowRaw) ? (float) $rowRaw : 0.0,
+            imageUrl: $imageUrl,
+            productUrl: $productUrl,
         );
     }
 
