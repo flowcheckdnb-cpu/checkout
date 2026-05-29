@@ -27,6 +27,7 @@ use Throwable;
  */
 class TestEmailService
 {
+    public const ALL_STAGES = ['stage_1', 'stage_2', 'stage_3', 'low_stock'];
     private const SAMPLE_SKUS = ['24-MB01', 'WS03', 'WS04', 'WJ01'];
     private const FALLBACK_PRODUCT_NAME = 'Iris Workout Top (sample)';
     private const FALLBACK_PRICE = 49.99;
@@ -51,9 +52,10 @@ class TestEmailService
     }
 
     /**
-     * Send one test email of the given type to the given recipient.
+     * Send one or all test emails to the given recipient.
      *
-     * @param string $emailType One of stage_1|stage_2|stage_3|low_stock.
+     * @param string $emailType "all" to fire every stage in sequence, otherwise one of
+     *                          stage_1|stage_2|stage_3|low_stock.
      * @param string $recipientEmail
      * @param int $storeId
      * @return void
@@ -61,6 +63,13 @@ class TestEmailService
      */
     public function send(string $emailType, string $recipientEmail, int $storeId): void
     {
+        if ($emailType === 'all') {
+            foreach (self::ALL_STAGES as $stage) {
+                $this->send($stage, $recipientEmail, $storeId);
+            }
+            return;
+        }
+
         if ($recipientEmail === '' || filter_var($recipientEmail, FILTER_VALIDATE_EMAIL) === false) {
             throw new LocalizedException(new Phrase('Invalid recipient email.'));
         }

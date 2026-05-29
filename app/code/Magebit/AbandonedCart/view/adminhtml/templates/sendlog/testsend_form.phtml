@@ -19,9 +19,11 @@ $labels = [
     'title' => $esc((string) __('Send a test email')),
     'desc' => $esc((string) __(
         'Dispatches one email of the selected type to the recipient using a sample cart.'
+        . ' Pick "All 4 stages" to fire the entire demo sequence in one click.'
         . ' No coupon is minted, no send-log row is written.',
     )),
     'type_label' => $esc((string) __('Email Type')),
+    'opt_all' => $esc((string) __('All 4 stages (demo sequence)')),
     'opt_stage_1' => $esc((string) __('Stage 1 — Initial Reminder')),
     'opt_stage_2' => $esc((string) __('Stage 2 — Follow-up')),
     'opt_stage_3' => $esc((string) __('Stage 3 — Final + Coupon')),
@@ -49,6 +51,7 @@ $labels = [
             </label>
             <div class="admin__field-control">
                 <select id="email_type" name="email_type" class="admin__control-select" required>
+                    <option value="all"><?= /* @noEscape */ $labels['opt_all'] ?></option>
                     <option value="stage_1"><?= /* @noEscape */ $labels['opt_stage_1'] ?></option>
                     <option value="stage_2"><?= /* @noEscape */ $labels['opt_stage_2'] ?></option>
                     <option value="stage_3"><?= /* @noEscape */ $labels['opt_stage_3'] ?></option>

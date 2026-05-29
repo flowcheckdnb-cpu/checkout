@@ -58,9 +58,10 @@ class TestSendSave extends Action implements HttpPostActionInterface
 
         try {
             $this->testEmailService->send($type, $email, $storeId);
-            $this->messages->addSuccessMessage(
-                (string) __('Test %1 email sent to %2.', $type, $email),
-            );
+            $msg = $type === 'all'
+                ? (string) __('Sent 4 test emails (stage 1, 2, 3, low-stock) to %1.', $email)
+                : (string) __('Test %1 email sent to %2.', $type, $email);
+            $this->messages->addSuccessMessage($msg);
         } catch (Throwable $e) {
             $this->messages->addErrorMessage($e->getMessage());
         }
