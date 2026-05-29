@@ -113,9 +113,14 @@ class TestEmailService
             $coupon !== null ? $coupon->code : null,
         );
 
+        // $store->getUrl() resolves via the area-scoped UrlInterface — under
+        // adminhtml that's Backend\Model\Url which prepends /admin/ and the
+        // admin secret key. For preview emails we always want frontend URLs,
+        // so we build them from the store's frontend base URL directly.
+        $baseUrl = rtrim($store->getBaseUrl(UrlInterface::URL_TYPE_LINK), '/');
         $extraVars = [
-            'recovery_url' => $store->getUrl('checkout/cart'),
-            'unsubscribe_url' => $store->getUrl('cms/noroute'),
+            'recovery_url' => $baseUrl . '/checkout/cart/',
+            'unsubscribe_url' => $baseUrl . '/cms/noroute/',
             'coupon_code' => $coupon !== null ? $coupon->code : '',
             'coupon_expires_at' => $coupon !== null && $coupon->expiresAtUnix !== null
                 ? date('M j, Y', $coupon->expiresAtUnix)
