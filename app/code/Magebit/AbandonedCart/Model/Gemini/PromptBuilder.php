@@ -99,6 +99,79 @@ class PromptBuilder
     }
 
     /**
+     * Build a single Gemini payload that asks for all four stage emails in one response.
+     *
+     * The response is an OBJECT keyed by stage name, each value being the same
+     * {subject, preheader, body_markdown} shape returned by a per-stage call.
+     * Quotas-friendly: one API call instead of four for the "All 4 stages" demo.
+     *
+     * @param string[] $stageKeys Ordered list of stages to generate (e.g. all 4).
+     * @param BrandVoiceProfile $voice
+     * @param string $customerFirstName
+     * @param string $storeName
+     * @param CartItemSummary[] $cartItems
+     * @param float $cartSubtotal
+     * @param string $currency
+     * @param array $couponCodesByStage Map of stage_key → coupon code (or null).
+     * @phpstan-param array<string, string|null> $couponCodesByStage
+     * @return array<string, mixed>
+     */
+    public function buildBatch(
+        array $stageKeys,
+        BrandVoiceProfile $voice,
+        string $customerFirstName,
+        string $storeName,
+        array $cartItems,
+        float $cartSubtotal,
+        string $currency,
+        array $couponCodesByStage,
+    ): array {
+        $emailSchema = [
+            'type' => 'OBJECT',
+            'properties' => [
+                'subject' => ['type' => 'STRING'],
+                'preheader' => ['type' => 'STRING'],
+                'body_markdown' => ['type' => 'STRING'],
+            ],
+            'required' => ['subject', 'preheader', 'body_markdown'],
+        ];
+
+        $properties = [];
+        foreach ($stageKeys as $stage) {
+            $properties[$stage] = $emailSchema;
+        }
+
+        return [
+            'systemInstruction' => [
+                'parts' => [['text' => $this->systemTextBatch($voice, count($stageKeys))]],
+            ],
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [[
+                    'text' => $this->userTextBatch(
+                        $stageKeys,
+                        $customerFirstName,
+                        $storeName,
+                        $cartItems,
+                        $cartSubtotal,
+                        $currency,
+                        $couponCodesByStage,
+                    ),
+                ]],
+            ]],
+            'generationConfig' => [
+                'responseMimeType' => 'application/json',
+                'responseSchema' => [
+                    'type' => 'OBJECT',
+                    'properties' => $properties,
+                    'required' => $stageKeys,
+                ],
+                'temperature' => 0.95,
+            ],
+        ];
+    }
+
+    /**
      * Compose the cached system instruction.
      *
      * @param BrandVoiceProfile $voice
@@ -204,5 +277,123 @@ class PromptBuilder
     private function pickStyle(): string
     {
         return self::STYLE_VARIANTS[array_rand(self::STYLE_VARIANTS)];
+    }
+
+    /**
+     * System instruction tuned for a batch request producing N distinct emails.
+     *
+     * @param BrandVoiceProfile $voice
+     * @param int $stageCount
+     * @return string
+     */
+    private function systemTextBatch(BrandVoiceProfile $voice, int $stageCount): string
+    {
+        $brand = $voice->brandName;
+        $voiceDesc = $voice->voiceDescription !== ''
+            ? $voice->voiceDescription
+            : 'Warm, helpful, customer-first.';
+
+        return implode("\n", [
+            "You are an e-commerce email copywriter for {$brand}.",
+            '',
+            "Brand voice: {$voiceDesc}",
+            "Tone: {$voice->tone}",
+            "Locale: {$voice->locale} — respond in this language.",
+            '',
+            "You will craft {$stageCount} distinct abandoned-cart recovery emails in one response,"
+                . ' keyed by stage name in the output JSON.',
+            '',
+            'Hard rules (apply to every email):',
+            '- Output strictly valid JSON matching the provided schema.'
+                . " The top-level object MUST contain exactly {$stageCount} keys (one per requested stage).",
+            '- Subject: ≤60 characters, attention-grabbing, no clickbait.',
+            '- Preheader: ≤90 characters, complements the subject.',
+            '- Body: 2-3 short paragraphs of markdown.'
+                . ' Use plain paragraphs, **bold** for emphasis.'
+                . ' No headings, no images, no bullet lists unless they read naturally.',
+            '- Do NOT include any links, URLs, button text, or "click here" phrases in the body.'
+                . ' A "Return to your cart" CTA button is added by the email template separately.',
+            '- Never fabricate discounts, stock numbers, shipping promises,'
+                . ' or product claims not provided in the user content.',
+            '- Anti-staleness: do NOT default to greeting-line openings like "Hey {name}",'
+                . ' "Hi there", "Hello {name}", or "Psst...".'
+                . ' Each stage carries its own "Style" hint — follow it.',
+            '- The customer\'s first name may be referenced ONCE at most across all emails combined.',
+            '- Vary subject line shapes across the set (questions, statements, observations,'
+                . ' mid-thought fragments). Make the four emails feel like a coherent escalation,'
+                . ' not four copies of the same idea. Never start a subject with the customer\'s name.',
+        ]);
+    }
+
+    /**
+     * User content tuned for a batch request: shared cart context + per-stage descriptors + styles.
+     *
+     * @param string[] $stageKeys
+     * @param string $customerFirstName
+     * @param string $storeName
+     * @param CartItemSummary[] $cartItems
+     * @param float $cartSubtotal
+     * @param string $currency
+     * @param array $couponCodesByStage
+     * @phpstan-param array<string, string|null> $couponCodesByStage
+     * @return string
+     */
+    private function userTextBatch(
+        array $stageKeys,
+        string $customerFirstName,
+        string $storeName,
+        array $cartItems,
+        float $cartSubtotal,
+        string $currency,
+        array $couponCodesByStage,
+    ): string {
+        $name = $customerFirstName !== '' ? $customerFirstName : 'there';
+
+        $lines = [];
+        $lines[] = "Customer first name: {$name}";
+        $lines[] = "Store: {$storeName}";
+        $lines[] = '';
+        $lines[] = 'Cart items:';
+        foreach ($cartItems as $item) {
+            $qty = rtrim(rtrim(number_format($item->qty, 2, '.', ''), '0'), '.');
+            $price = number_format($item->rowTotal, 2, '.', '');
+            $lines[] = "- {$item->name} × {$qty} — {$currency} {$price}";
+        }
+        $lines[] = '';
+        $lines[] = 'Cart subtotal: ' . $currency . ' ' . number_format($cartSubtotal, 2, '.', '');
+        $lines[] = '';
+        $lines[] = 'Requested stages (write one email per stage, keyed by stage name):';
+
+        $styles = $this->pickDistinctStyles(count($stageKeys));
+        foreach ($stageKeys as $i => $stage) {
+            $descriptor = self::STAGE_DESCRIPTORS[$stage] ?? 'general abandoned-cart recovery email.';
+            $lines[] = '';
+            $lines[] = "### {$stage}";
+            $lines[] = "Stage: {$descriptor}";
+            $lines[] = 'Style for this email: ' . ($styles[$i] ?? '');
+            $coupon = $couponCodesByStage[$stage] ?? null;
+            if ($coupon !== null && $coupon !== '') {
+                $lines[] = "Discount code for this stage"
+                    . " (mention naturally; the template displays it separately): {$coupon}";
+            }
+        }
+
+        $lines[] = '';
+        $lines[] = 'Respond with JSON only. Top-level object keyed by stage name.';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Pick N distinct rhetorical styles so the batched emails don't all open the same way.
+     *
+     * @param int $count
+     * @return string[]
+     */
+    private function pickDistinctStyles(int $count): array
+    {
+        $variants = self::STYLE_VARIANTS;
+        shuffle($variants);
+        return array_slice($variants, 0, max(0, $count));
     }
 }

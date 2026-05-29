@@ -80,10 +80,7 @@ class TestEmailService
     public function send(string $emailType, string $recipientEmail, int $storeId): void
     {
         if ($emailType === 'all') {
-            foreach (self::ALL_STAGES as $stage) {
-                $this->send($stage, $recipientEmail, $storeId);
-            }
-            $this->pushSummaryNotification($recipientEmail);
+            $this->sendAll($recipientEmail, $storeId);
             return;
         }
 
@@ -153,6 +150,91 @@ class TestEmailService
             self::SAMPLE_CURRENCY,
             $extraVars,
         );
+    }
+
+    /**
+     * Batched "All 4 stages" path: one Gemini call covers every stage's copy.
+     *
+     * Mints coupons + resolves the recipient's real cart upfront, then asks the
+     * BrandVoiceEmailGenerator for all four bodies in one round-trip. Each stage
+     * is dispatched with its own template + coupon + extra vars. Quota-friendly
+     * (1 API call instead of 4) and reads as one coherent escalation rather than
+     * four independent emails.
+     *
+     * @param string $recipientEmail
+     * @param int $storeId
+     * @return void
+     * @throws LocalizedException
+     */
+    private function sendAll(string $recipientEmail, int $storeId): void
+    {
+        if ($recipientEmail === '' || filter_var($recipientEmail, FILTER_VALIDATE_EMAIL) === false) {
+            throw new LocalizedException(new Phrase('Invalid recipient email.'));
+        }
+        $store = $this->storeManager->getStore($storeId);
+        if (!$store instanceof Store) {
+            throw new LocalizedException(new Phrase('Invalid store id: %1', [$storeId]));
+        }
+
+        $recipientFirstName = $this->resolveFirstName($recipientEmail, $store);
+        $realCartItems = $this->loadRealCartItems($recipientEmail, $store);
+        if ($realCartItems !== []) {
+            $items = $realCartItems;
+            $subtotal = 0.0;
+            foreach ($items as $row) {
+                $subtotal += $row->rowTotal;
+            }
+        } else {
+            $items = [$this->buildSampleItem($store, $storeId)];
+            $subtotal = $items[0]->rowTotal;
+        }
+
+        $coupons = [];
+        $couponCodes = [];
+        foreach (self::ALL_STAGES as $stage) {
+            $c = $this->sampleCoupon($stage, $storeId, $recipientFirstName);
+            $coupons[$stage] = $c;
+            $couponCodes[$stage] = $c?->code;
+        }
+
+        $generated = $this->generator->generateBatch(
+            self::ALL_STAGES,
+            $storeId,
+            $recipientFirstName,
+            (string) $store->getName(),
+            $items,
+            $subtotal,
+            self::SAMPLE_CURRENCY,
+            $couponCodes,
+        );
+
+        $baseUrl = rtrim($store->getBaseUrl(UrlInterface::URL_TYPE_LINK), '/');
+        foreach (self::ALL_STAGES as $stage) {
+            $template = $this->resolveTemplate($stage, $storeId);
+            if ($template === '') {
+                continue;
+            }
+            $coupon = $coupons[$stage] ?? null;
+            $this->dispatcher->send(
+                $storeId,
+                $recipientEmail,
+                $recipientFirstName,
+                $template,
+                $generated[$stage],
+                $items,
+                self::SAMPLE_CURRENCY,
+                [
+                    'recovery_url' => $baseUrl . '/checkout/cart/',
+                    'unsubscribe_url' => $baseUrl . '/cms/noroute/',
+                    'coupon_code' => $coupon !== null ? $coupon->code : '',
+                    'coupon_expires_at' => $coupon !== null && $coupon->expiresAtUnix !== null
+                        ? date('M j, Y', $coupon->expiresAtUnix)
+                        : '',
+                ],
+            );
+        }
+
+        $this->pushSummaryNotification($recipientEmail);
     }
 
     /**

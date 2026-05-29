@@ -42,6 +42,50 @@ class ResponseParser
     }
 
     /**
+     * Convert a decoded Gemini batch response into a map of stage_key → GeneratedEmail.
+     *
+     * Per-stage entries that are missing or malformed are skipped silently — the
+     * caller is expected to fall back to a static template for any stage not in
+     * the returned map.
+     *
+     * @param array $response
+     * @phpstan-param array<string, mixed> $response
+     * @return array<string, GeneratedEmail>
+     * @throws GeminiException
+     */
+    public function parseBatch(array $response): array
+    {
+        $text = $this->extractText($response);
+        $stripped = $this->stripFences($text);
+
+        $decoded = json_decode($stripped, true);
+        if (!is_array($decoded)) {
+            throw new GeminiException(new Phrase('Gemini batch response is not valid JSON.'));
+        }
+
+        $out = [];
+        foreach ($decoded as $stage => $email) {
+            if (!is_string($stage) || !is_array($email)) {
+                continue;
+            }
+            try {
+                $out[$stage] = new GeneratedEmail(
+                    subject: $this->stringField($email, 'subject', self::SUBJECT_MAX),
+                    preheader: $this->stringField($email, 'preheader', self::PREHEADER_MAX),
+                    bodyMarkdown: $this->bodyField($email),
+                    aiGenerated: true,
+                );
+            } catch (GeminiException $skipBadStage) {
+                unset($skipBadStage);
+            }
+        }
+        if ($out === []) {
+            throw new GeminiException(new Phrase('Gemini batch response contained no usable stages.'));
+        }
+        return $out;
+    }
+
+    /**
      * Pull the model's text part from the response envelope.
      *
      * @param array $response
