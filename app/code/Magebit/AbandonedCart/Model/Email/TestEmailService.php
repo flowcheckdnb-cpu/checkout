@@ -6,10 +6,12 @@ namespace Magebit\AbandonedCart\Model\Email;
 
 use Magebit\AbandonedCart\Model\Config;
 use Magebit\AbandonedCart\Service\Coupon\GeneratedCoupon;
+use Magento\Backend\Model\UrlInterface as BackendUrl;
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Model\Product;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Framework\Notification\NotifierInterface;
 use Magento\Framework\Phrase;
 use Magento\Framework\UrlInterface;
 use Magento\Store\Model\Store;
@@ -41,6 +43,8 @@ class TestEmailService
      * @param EmailDispatcher $dispatcher
      * @param StoreManagerInterface $storeManager
      * @param ProductRepositoryInterface $productRepository
+     * @param NotifierInterface $notifier
+     * @param BackendUrl $backendUrl
      */
     public function __construct(
         private readonly Config $config,
@@ -48,6 +52,8 @@ class TestEmailService
         private readonly EmailDispatcher $dispatcher,
         private readonly StoreManagerInterface $storeManager,
         private readonly ProductRepositoryInterface $productRepository,
+        private readonly NotifierInterface $notifier,
+        private readonly BackendUrl $backendUrl,
     ) {
     }
 
@@ -67,6 +73,7 @@ class TestEmailService
             foreach (self::ALL_STAGES as $stage) {
                 $this->send($stage, $recipientEmail, $storeId);
             }
+            $this->pushSummaryNotification($recipientEmail);
             return;
         }
 
@@ -224,6 +231,27 @@ class TestEmailService
         return new GeneratedCoupon(
             code: 'DEMO-' . $suffix,
             expiresAtUnix: time() + self::COUPON_TTL_HOURS * 3600,
+        );
+    }
+
+    /**
+     * Drop a summary line into the admin's bell-icon inbox after a successful
+     * "all stages" demo run, with a click-through to the send-log grid.
+     *
+     * @param string $recipientEmail
+     * @return void
+     */
+    private function pushSummaryNotification(string $recipientEmail): void
+    {
+        $url = $this->backendUrl->getUrl('magebit_abandonedcart/sendlog/index');
+        $this->notifier->addMajor(
+            (string) __('Abandoned-cart demo emails dispatched'),
+            (string) __(
+                '4 preview emails (stage 1, 2, 3, low-stock) were sent to %1.'
+                . ' Open Mailpit to view them.',
+                $recipientEmail,
+            ),
+            $url,
         );
     }
 }
