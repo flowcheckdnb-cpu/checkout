@@ -10,6 +10,7 @@ use Magebit\AbandonedCart\Model\Config;
 use Magebit\AbandonedCart\Model\Log\SendLogRepository;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\ResourceModel\Quote\CollectionFactory as QuoteCollectionFactory;
+use Throwable;
 
 /**
  * Selects active quotes whose updated_at has aged past the configured stage delay
@@ -80,9 +81,38 @@ class AbandonedCartFinder
             if (is_string($emailRaw) && $this->logRepository->isUnsubscribed($emailRaw, $storeId)) {
                 continue;
             }
+            if (!$this->hasSalableItem($quote)) {
+                continue;
+            }
             $eligible[] = $quote;
         }
 
         return $eligible;
+    }
+
+    /**
+     * Whether the quote contains at least one visible item whose product is currently
+     * salable (enabled, in stock, visible). Skips carts where everything is OOS or disabled —
+     * no point asking a customer to recover a cart they can't actually check out from.
+     *
+     * @param Quote $quote
+     * @return bool
+     */
+    private function hasSalableItem(Quote $quote): bool
+    {
+        foreach ($quote->getAllVisibleItems() as $item) {
+            $product = $item->getProduct();
+            if ($product === null) {
+                continue;
+            }
+            try {
+                if ($product->isSalable()) {
+                    return true;
+                }
+            } catch (Throwable) {
+                continue;
+            }
+        }
+        return false;
     }
 }
